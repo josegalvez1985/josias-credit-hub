@@ -38,7 +38,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const { user, login } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { canInstall, promptInstall } = usePwaInstall();
+  const { canInstall, iosInstall, promptInstall } = usePwaInstall();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -215,6 +215,13 @@ function LoginPage() {
               <Download className="h-4 w-4" />
               Instalar app en este dispositivo
             </Button>
+          )}
+
+          {iosInstall && (
+            <p className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-secondary/10 px-3 py-2.5 text-center text-xs text-muted-foreground">
+              <Download className="h-3.5 w-3.5 shrink-0 text-secondary" />
+              Para instalar: toca Compartir y luego “Agregar a inicio”.
+            </p>
           )}
         </form>
 

@@ -19,6 +19,15 @@ if (typeof window !== "undefined") {
   });
 }
 
+export function isIOS() {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    // iPadOS se reporta como Mac con touch
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
 function isStandalone() {
   if (typeof window === "undefined") return false;
   return (
@@ -62,5 +71,8 @@ export function usePwaInstall() {
     return outcome === "accepted";
   };
 
-  return { canInstall: canInstall && !installed, installed, promptInstall };
+  // En iOS no hay prompt programático: se muestra instrucción manual.
+  const iosInstall = isIOS() && !installed;
+
+  return { canInstall: canInstall && !installed, installed, iosInstall, promptInstall };
 }

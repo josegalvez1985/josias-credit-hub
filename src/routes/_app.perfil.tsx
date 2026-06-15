@@ -31,7 +31,7 @@ export const Route = createFileRoute("/_app/perfil")({
 function ProfilePage() {
   const { user, logout, changePassword, updateUser } = useAuth();
   const { theme, setTheme } = useTheme();
-  const { canInstall, installed, promptInstall } = usePwaInstall();
+  const { canInstall, installed, iosInstall, promptInstall } = usePwaInstall();
   const navigate = useNavigate();
 
   const [current, setCurrent] = useState("");
@@ -254,7 +254,7 @@ function ProfilePage() {
         </form>
       </Card>
 
-      {(canInstall || installed) && (
+      {(canInstall || installed || iosInstall) && (
         <Card className="p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -266,7 +266,9 @@ function ProfilePage() {
                 <p className="mt-1 text-sm text-muted-foreground">
                   {installed
                     ? "La app ya está instalada en este dispositivo."
-                    : "Agrégala a tu pantalla de inicio para abrirla como una app."}
+                    : iosInstall
+                      ? "Toca el botón Compartir de Safari y luego “Agregar a inicio”."
+                      : "Agrégala a tu pantalla de inicio para abrirla como una app."}
                 </p>
               </div>
             </div>
