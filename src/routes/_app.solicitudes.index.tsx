@@ -36,7 +36,11 @@ function ApplicationsList() {
     setError(null);
     listarCabeceras()
       .then(async (cabs) => {
-        const ordenadas = [...cabs].sort((a, b) => b.id - a.id);
+        const ordenadas = [...cabs].sort(
+          (a, b) =>
+            new Date(b.fecha_factura).getTime() - new Date(a.fecha_factura).getTime() ||
+            b.id - a.id,
+        );
         setItems(ordenadas);
         try {
           setNombres(await nombresClientes(ordenadas.map((c) => c.cod_cliente)));
@@ -53,13 +57,15 @@ function ApplicationsList() {
   const filtered = useMemo(() => {
     if (!query) return items;
     const q = query.toLowerCase();
-    return items.filter(
-      (a) =>
-        String(a.nro_solicitud).includes(q) ||
-        (nombres.get(a.cod_cliente) ?? "").toLowerCase().includes(q) ||
-        String(a.cod_cliente).includes(q) ||
-        (a.referencia ?? "").toLowerCase().includes(q),
-    );
+    return items.filter((a) => {
+      const haystack = [
+        ...Object.values(a).map((v) => (v == null ? "" : String(v))),
+        nombres.get(a.cod_cliente) ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
   }, [items, query, nombres]);
 
   return (
@@ -90,7 +96,7 @@ function ApplicationsList() {
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Buscar por N° solicitud, cliente o referencia..."
+          placeholder="Buscar en cualquier dato de la solicitud..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="h-11 rounded-full bg-card pl-10"
@@ -135,9 +141,17 @@ function ApplicationsList() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <p className="truncate font-medium">{nombre}</p>
-                        <span className="font-mono text-[10px] text-muted-foreground">#{a.nro_solicitud}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground">
+                          {a.estado === "APROBADO" ? `#${a.nro_solicitud}` : "—"}
+                        </span>
+                        {a.estado && (
+                          <span className="rounded-full bg-secondary/15 px-2 py-0.5 text-[10px] font-medium text-secondary">
+                            {a.estado}
+                          </span>
+                        )}
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <p className="mt-1 font-display text-lg font-semibold tracking-tight">{formatCurrency(a.total)}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         <span>{a.cantidad_cuotas} cuotas</span>
                         <span aria-hidden>·</span>
                         <span>{formatCurrency(a.monto_cuota)}/mes</span>
@@ -148,9 +162,6 @@ function ApplicationsList() {
                           </>
                         )}
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-display text-lg font-semibold tracking-tight">{formatCurrency(a.total)}</p>
                     </div>
                   </div>
                 </Card>

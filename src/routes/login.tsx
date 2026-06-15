@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate, Navigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Eye, EyeOff, Fingerprint, Loader2, Moon, Sun } from "lucide-react";
+import { Download, Eye, EyeOff, Fingerprint, Loader2, Moon, Sun } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { usePwaInstall } from "@/lib/pwa";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,17 @@ import {
   verifyBiometric,
 } from "@/lib/webauthn";
 import { toast } from "sonner";
+
+const REMEMBER_KEY = "jm-remember-credentials";
+
+function loadRemembered(): { username: string; password: string } | null {
+  try {
+    const raw = localStorage.getItem(REMEMBER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -26,6 +38,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const { user, login } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { canInstall, promptInstall } = usePwaInstall();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -33,9 +46,16 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [bioAvailable, setBioAvailable] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
+  const [remember, setRemember] = useState(false);
 
   useEffect(() => {
     setBioAvailable(hasRegisteredBiometric());
+    const saved = loadRemembered();
+    if (saved) {
+      setUsername(saved.username);
+      setPassword(saved.password);
+      setRemember(true);
+    }
   }, []);
 
   if (user) return <Navigate to="/dashboard" />;
@@ -61,6 +81,11 @@ function LoginPage() {
     setLoading(true);
     try {
       await login(username.trim(), password);
+      if (remember) {
+        localStorage.setItem(REMEMBER_KEY, JSON.stringify({ username: username.trim(), password }));
+      } else {
+        localStorage.removeItem(REMEMBER_KEY);
+      }
       toast.success("Bienvenido");
       navigate({ to: "/dashboard" });
     } catch (err) {
@@ -71,36 +96,40 @@ function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
-      {/* Decorative gradient panel */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[55vh] bg-gradient-wood opacity-95" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[55vh] bg-[radial-gradient(circle_at_top_right,oklch(0.72_0.12_55/0.35),transparent_60%)]" />
+    <div className="relative min-h-screen overflow-hidden bg-background lg:grid lg:grid-cols-2">
+      {/* Decorative gradient panel — top band on mobile, full left column on desktop */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[55vh] bg-gradient-wood opacity-95 lg:inset-0 lg:right-auto lg:h-full lg:w-1/2" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[55vh] bg-[radial-gradient(circle_at_top_right,oklch(0.72_0.12_55/0.35),transparent_60%)] lg:inset-0 lg:right-auto lg:h-full lg:w-1/2" />
 
       <div className="absolute right-4 top-4 z-10">
-        <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-primary-foreground/80 hover:bg-white/10 hover:text-primary-foreground">
+        <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-primary-foreground/80 hover:bg-white/10 hover:text-primary-foreground lg:text-foreground/60 lg:hover:bg-muted lg:hover:text-foreground">
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
       </div>
 
-      <div className="relative mx-auto flex min-h-screen max-w-md flex-col px-6 pb-10 pt-16">
-        <div className="text-primary-foreground">
-          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white/95 backdrop-blur-sm ring-1 ring-white/20">
+      {/* Brand column */}
+      <div className="relative z-10 flex flex-col px-6 pt-16 text-primary-foreground lg:justify-center lg:px-16 lg:pt-0">
+        <div className="mx-auto w-full max-w-md lg:mx-0 lg:max-w-lg">
+          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white/95 backdrop-blur-sm ring-1 ring-white/20 lg:h-16 lg:w-16">
             <img src="/logo.png" alt="Josias Muebles" className="h-full w-full object-contain p-1.5" />
           </div>
           <p className="mt-8 text-[11px] font-medium uppercase tracking-[0.28em] text-primary-foreground/70">
             Josias Muebles
           </p>
-          <h1 className="mt-2 font-display text-4xl font-semibold leading-tight">
+          <h1 className="mt-2 font-display text-4xl font-semibold leading-tight lg:text-5xl">
             Accede a tu cuenta
           </h1>
-          <p className="mt-3 max-w-sm text-sm text-primary-foreground/80">
+          <p className="mt-3 max-w-sm text-sm text-primary-foreground/80 lg:text-base">
             Bienvenido de nuevo. Inicia sesión para continuar gestionando las solicitudes de tus clientes.
           </p>
         </div>
+      </div>
 
+      {/* Form column */}
+      <div className="relative z-10 flex flex-col px-6 pb-10 lg:justify-center lg:px-16 lg:pb-0 lg:pt-0">
         <form
           onSubmit={onSubmit}
-          className="mt-10 rounded-3xl border border-border bg-card p-6 shadow-warm sm:p-7"
+          className="mx-auto mt-10 w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-warm sm:p-7 lg:mt-0"
         >
           <div className="space-y-1.5">
             <Label htmlFor="username">Usuario o correo</Label>
@@ -109,7 +138,7 @@ function LoginPage() {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="maria"
+              placeholder="jessicag"
               required
               className="h-11"
             />
@@ -139,10 +168,20 @@ function LoginPage() {
             </div>
           </div>
 
+          <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-secondary"
+            />
+            Recordar mi contraseña
+          </label>
+
           <Button
             type="submit"
             disabled={loading}
-            className="mt-6 h-11 w-full rounded-xl bg-gradient-caramel text-base font-medium text-primary-foreground shadow-elegant hover:opacity-95"
+            className="mt-4 h-11 w-full rounded-xl bg-gradient-caramel text-base font-medium text-primary-foreground shadow-elegant hover:opacity-95"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Iniciar sesión"}
           </Button>
@@ -166,18 +205,20 @@ function LoginPage() {
             </Button>
           )}
 
-          <div className="mt-5 rounded-xl border border-dashed border-border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">Cuentas de prueba</p>
-            <p className="mt-1">
-              <span className="font-mono">maria</span> / <span className="font-mono">demo123</span>
-            </p>
-            <p>
-              <span className="font-mono">carlos</span> / <span className="font-mono">demo123</span>
-            </p>
-          </div>
+          {canInstall && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={promptInstall}
+              className="mt-3 h-11 w-full rounded-xl text-secondary hover:bg-secondary/10"
+            >
+              <Download className="h-4 w-4" />
+              Instalar app en este dispositivo
+            </Button>
+          )}
         </form>
 
-        <p className="mt-auto pt-6 text-center text-[11px] text-muted-foreground">
+        <p className="mx-auto w-full max-w-md pt-6 text-center text-[11px] text-muted-foreground lg:absolute lg:bottom-6 lg:left-1/2 lg:-translate-x-1/2">
           © {new Date().getFullYear()} Plataforma interna
         </p>
       </div>

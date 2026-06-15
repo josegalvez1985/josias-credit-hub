@@ -36,7 +36,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok || (data && typeof data === "object" && (data as { success?: boolean }).success === false)) {
     const msg =
-      (data && typeof data === "object" && (data as { message?: string }).message) || `Error ${res.status}`;
+      (data && typeof data === "object" &&
+        ((data as { message?: string }).message ||
+          (data as { error?: string }).error ||
+          (data as { detail?: string }).detail)) ||
+      (typeof data === "string" && data) ||
+      `Error ${res.status}`;
     throw new Error(String(msg));
   }
   return data as T;
@@ -166,7 +171,7 @@ export function obtenerCliente(cod: number) {
   return request<Cliente>(`/clientes/${cod}`);
 }
 
-export type Cabecera = CabeceraInput & { id: number };
+export type Cabecera = CabeceraInput & { id: number; estado?: string };
 
 export function listarCabeceras() {
   return request<OrdsFeed<Cabecera>>("/solicitudes/cabecera").then((r) => r.items ?? []);

@@ -100,22 +100,29 @@ function Dashboard() {
           <div className="grid gap-3 lg:grid-cols-2">
             {items.slice(0, 4).map((a) => (
               <Link key={a.id} to="/solicitudes" className="block">
-                <Card className="flex h-full items-center gap-4 p-4 transition-all hover:-translate-y-0.5 hover:shadow-elegant">
+                <Card className="flex h-full items-center gap-3 p-4 transition-all hover:-translate-y-0.5 hover:shadow-elegant">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary/15 text-secondary">
                     <FileText className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate font-medium">Solicitud #{a.nro_solicitud}</p>
-                      <span className="font-mono text-[10px] text-muted-foreground">ID {a.id}</span>
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate font-medium">
+                        Solicitud {a.estado === "APROBADO" ? `#${a.nro_solicitud}` : "—"}
+                      </p>
+                      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">ID {a.id}</span>
+                      {a.estado && (
+                        <span className="shrink-0 rounded-full bg-secondary/15 px-2 py-0.5 text-[10px] font-medium text-secondary">
+                          {a.estado}
+                        </span>
+                      )}
                     </div>
                     <p className="truncate text-sm text-muted-foreground">
                       {a.referencia || `Cliente ${a.cod_cliente}`}
                     </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-display text-base font-semibold">{formatCurrency(a.total)}</p>
-                    <p className="text-xs text-muted-foreground">{a.cantidad_cuotas} cuotas</p>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <p className="font-display text-base font-semibold">{formatCurrency(a.total)}</p>
+                      <p className="text-xs text-muted-foreground">{a.cantidad_cuotas} cuotas</p>
+                    </div>
                   </div>
                 </Card>
               </Link>

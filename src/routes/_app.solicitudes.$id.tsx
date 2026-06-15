@@ -119,8 +119,17 @@ function SolicitudDetalle() {
               <span className="font-display text-xl font-semibold">{nombre.charAt(0)}</span>
             </div>
             <div>
-              <h1 className="font-display text-2xl font-semibold">{nombre}</h1>
-              <p className="text-sm text-muted-foreground">Solicitud #{cab.nro_solicitud} · ID {cab.id}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-display text-2xl font-semibold">{nombre}</h1>
+                {cab.estado && (
+                  <span className="rounded-full bg-secondary/15 px-2.5 py-0.5 text-[11px] font-medium text-secondary">
+                    {cab.estado}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Solicitud {cab.estado === "APROBADO" ? `#${cab.nro_solicitud}` : "—"} · ID {cab.id}
+              </p>
             </div>
           </div>
           <div className="text-right">

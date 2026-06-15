@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Fingerprint, LogOut, Moon, Shield, Sun, Loader2, Mail, CheckCircle2 } from "lucide-react";
+import { Download, Fingerprint, LogOut, Moon, Shield, Sun, Loader2, Mail, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { usePwaInstall } from "@/lib/pwa";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/_app/perfil")({
 function ProfilePage() {
   const { user, logout, changePassword, updateUser } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { canInstall, installed, promptInstall } = usePwaInstall();
   const navigate = useNavigate();
 
   const [current, setCurrent] = useState("");
@@ -251,6 +253,31 @@ function ProfilePage() {
           </Button>
         </form>
       </Card>
+
+      {(canInstall || installed) && (
+        <Card className="p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary/15 text-secondary">
+                <Download className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-display text-lg font-semibold">Instalar app</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {installed
+                    ? "La app ya está instalada en este dispositivo."
+                    : "Agrégala a tu pantalla de inicio para abrirla como una app."}
+                </p>
+              </div>
+            </div>
+            {canInstall && (
+              <Button onClick={promptInstall} className="bg-primary text-primary-foreground hover:opacity-90">
+                Instalar
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
 
       <Button
         variant="outline"

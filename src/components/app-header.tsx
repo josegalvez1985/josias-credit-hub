@@ -57,14 +57,12 @@ export function AppHeader() {
           >
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
-          <div className="hidden items-center gap-2 pl-2 sm:flex">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary/20 text-sm font-semibold text-foreground">
-              {user?.name.charAt(0) ?? "U"}
-            </div>
-            <Button variant="ghost" size="icon" onClick={logout} aria-label="Cerrar sesión" className="rounded-full">
-              <LogOut className="h-4 w-4" />
-            </Button>
+          <div className="hidden h-9 w-9 items-center justify-center rounded-full bg-secondary/20 text-sm font-semibold text-foreground sm:flex">
+            {user?.name.charAt(0) ?? "U"}
           </div>
+          <Button variant="ghost" size="icon" onClick={logout} aria-label="Cerrar sesión" className="rounded-full">
+            <LogOut className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </header>
