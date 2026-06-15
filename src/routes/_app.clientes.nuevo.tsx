@@ -42,8 +42,18 @@ function NewClient() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.razon_social.trim() || !form.ci.trim()) {
-      return toast.error("Nombre y CI son obligatorios");
+    const faltantes: string[] = [];
+    if (!form.razon_social.trim()) faltantes.push("Nombre / Razón social");
+    if (!form.ci.trim()) faltantes.push("Cédula (CI)");
+    if (!form.nro_telefono.trim()) faltantes.push("Teléfono");
+    if (!form.fecha_nacimiento.trim()) faltantes.push("Fecha de nacimiento");
+    if (!form.sexo.trim()) faltantes.push("Sexo");
+    if (!form.estado_civil.trim()) faltantes.push("Estado civil");
+    if (!ciudad) faltantes.push("Ciudad");
+    if (!form.direccion.trim()) faltantes.push("Dirección");
+    if (!form.vivienda.trim()) faltantes.push("Vivienda");
+    if (faltantes.length > 0) {
+      return toast.error(`Completá: ${faltantes.join(", ")}`);
     }
     setLoading(true);
     try {
@@ -54,6 +64,7 @@ function NewClient() {
       }
       const { cod_cliente } = await crearCliente({
         ...form,
+        nombre_fantasia: form.nombre_fantasia.trim() || form.razon_social.trim(),
         cod_ciudad: ciudad?.value,
         estado: "A",
       });
@@ -91,7 +102,17 @@ function NewClient() {
           <h2 className="font-display text-lg font-semibold">Datos personales</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Nombre / Razón social" required>
-              <Input value={form.razon_social} onChange={(e) => update("razon_social", e.target.value)} required />
+              <Input
+                value={form.razon_social}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    razon_social: e.target.value,
+                    nombre_fantasia: f.nombre_fantasia === f.razon_social ? e.target.value : f.nombre_fantasia,
+                  }))
+                }
+                required
+              />
             </Field>
             <Field label="Nombre de fantasía">
               <Input value={form.nombre_fantasia} onChange={(e) => update("nombre_fantasia", e.target.value)} />
@@ -102,13 +123,13 @@ function NewClient() {
             <Field label="RUC">
               <Input value={form.ruc} onChange={(e) => update("ruc", e.target.value)} />
             </Field>
-            <Field label="Teléfono">
-              <Input type="tel" value={form.nro_telefono} onChange={(e) => update("nro_telefono", e.target.value)} />
+            <Field label="Teléfono" required>
+              <Input type="tel" value={form.nro_telefono} onChange={(e) => update("nro_telefono", e.target.value)} required />
             </Field>
-            <Field label="Fecha de nacimiento">
-              <Input type="date" value={form.fecha_nacimiento} onChange={(e) => update("fecha_nacimiento", e.target.value)} />
+            <Field label="Fecha de nacimiento" required>
+              <Input type="date" value={form.fecha_nacimiento} onChange={(e) => update("fecha_nacimiento", e.target.value)} required />
             </Field>
-            <Field label="Sexo">
+            <Field label="Sexo" required>
               <div className="flex gap-2">
                 {(["M", "F"] as const).map((v) => (
                   <button
@@ -125,7 +146,7 @@ function NewClient() {
                 ))}
               </div>
             </Field>
-            <Field label="Estado civil">
+            <Field label="Estado civil" required>
               <div className="flex flex-wrap gap-2">
                 {([
                   ["S", "Soltero/a"],
@@ -154,7 +175,7 @@ function NewClient() {
         <Card className="space-y-5 p-6">
           <h2 className="font-display text-lg font-semibold">Domicilio</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Ciudad">
+            <Field label="Ciudad" required>
               <AsyncCombobox
                 value={ciudad?.value ?? null}
                 label={ciudad?.label ?? null}
@@ -165,10 +186,10 @@ function NewClient() {
             <Field label="N° de casa">
               <Input value={form.nro_casa} onChange={(e) => update("nro_casa", e.target.value)} />
             </Field>
-            <Field label="Dirección">
-              <Input value={form.direccion} onChange={(e) => update("direccion", e.target.value)} />
+            <Field label="Dirección" required>
+              <Input value={form.direccion} onChange={(e) => update("direccion", e.target.value)} required />
             </Field>
-            <Field label="Vivienda">
+            <Field label="Vivienda" required>
               <div className="flex flex-wrap gap-2">
                 {([
                   ["P", "Propia"],

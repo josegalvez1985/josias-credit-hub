@@ -56,8 +56,46 @@ function feed<T>(path: string, q?: string) {
   return request<OrdsFeed<T>>(`${path}${qs}`).then((r) => r.items ?? []);
 }
 
+type ClienteLov = LovItem & { nombre_fantasia?: string; ci?: string; ruc?: string };
+
+// Trae TODOS los clientes del LOV recorriendo las páginas de ORDS (25 por defecto).
+async function todosClientesLov(): Promise<ClienteLov[]> {
+  const out: ClienteLov[] = [];
+  let offset = 0;
+  for (;;) {
+    const f = await request<OrdsFeed<ClienteLov> & { hasMore?: boolean }>(
+      `/solicitudes/lov/clientes?limit=500&offset=${offset}`,
+    );
+    const items = f.items ?? [];
+    out.push(...items);
+    if (!f.hasMore || items.length === 0) break;
+    offset += items.length;
+  }
+  return out;
+}
+
+// Busca clientes por cualquier campo del LOV. Para números (CI/RUC) compara solo
+// dígitos en ambos lados, así "4169298" encuentra a "4.169.298" y viceversa.
+async function buscarClientesLov(q?: string): Promise<ClienteLov[]> {
+  const all = await todosClientesLov();
+  const term = (q ?? "").trim();
+  if (!term) return all;
+  const digits = term.replace(/\D/g, "");
+  const lower = term.toLowerCase();
+  return all.filter((c) => {
+    const texto = Object.values(c)
+      .map((v) => String(v ?? ""))
+      .join(" ")
+      .toLowerCase();
+    if (texto.includes(lower)) return true;
+    if (!digits) return false;
+    const soloDigitos = texto.replace(/\D/g, "");
+    return soloDigitos.includes(digits);
+  });
+}
+
 export const lov = {
-  clientes: (q?: string) => feed<LovItem & { nombre_fantasia?: string; ci?: string; ruc?: string }>("/solicitudes/lov/clientes", q),
+  clientes: buscarClientesLov,
   ciudades: (q?: string) => feed<LovItem>("/solicitudes/lov/ciudades", q),
   vendedores: (q?: string) => feed<LovItem>("/solicitudes/lov/vendedores", q),
   articulos: (q?: string) => feed<LovItem & { cod_unidad_medida?: number }>("/solicitudes/lov/articulos", q),
@@ -157,11 +195,20 @@ export function listarClientes(q?: string) {
 // Devuelve true si ya existe un cliente con ese CI.
 // El GET con ?q= devuelve 400 en este backend, así que traemos todo y filtramos local.
 // Algunos CI guardados tienen puntos (4.169.298) y otros no: normalizamos para comparar.
+// ORDS pagina (25 por defecto); recorremos todas las páginas para no pasar por alto un CI.
 export async function ciExiste(ci: string): Promise<boolean> {
   const norm = (v: string) => v.replace(/\D/g, "");
   const target = norm(ci);
-  const list = await listarClientes();
-  return list.some((c) => norm(c.ci ?? "") === target);
+  let offset = 0;
+  for (;;) {
+    const feed = await request<OrdsFeed<Cliente> & { hasMore?: boolean; limit?: number }>(
+      `/clientes/?limit=500&offset=${offset}`,
+    );
+    const items = feed.items ?? [];
+    if (items.some((c) => norm(c.ci ?? "") === target)) return true;
+    if (!feed.hasMore || items.length === 0) return false;
+    offset += items.length;
+  }
 }
 
 export function crearCliente(c: ClienteInput) {

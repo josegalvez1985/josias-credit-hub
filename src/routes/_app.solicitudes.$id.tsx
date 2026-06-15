@@ -17,6 +17,15 @@ import {
 import { formatCurrency } from "@/lib/credit-applications";
 import { Card } from "@/components/ui/card";
 
+const ESTADO_CIVIL: Record<string, string> = {
+  S: "Soltero/a",
+  C: "Casado/a",
+  D: "Divorciado/a",
+  O: "Concubinado/a",
+  V: "Viudo/a",
+};
+const VIVIENDA: Record<string, string> = { P: "Propia", A: "Alquiler", F: "Familiar" };
+
 type Labels = {
   articulos: Map<number, string>;
   ciudades: Map<number, string>;
@@ -151,11 +160,11 @@ function SolicitudDetalle() {
           <Row label="RUC" value={cliente?.ruc} />
           <Row label="Teléfono" value={cliente?.nro_telefono} />
           <Row label="Sexo" value={cliente?.sexo === "F" ? "Femenino" : cliente?.sexo === "M" ? "Masculino" : cliente?.sexo} />
-          <Row label="Estado civil" value={cliente?.estado_civil} />
+          <Row label="Estado civil" value={cliente?.estado_civil ? ESTADO_CIVIL[cliente.estado_civil] ?? cliente.estado_civil : undefined} />
           <Row label="Fecha de nacimiento" value={cliente?.fecha_nacimiento ? formatDate(cliente.fecha_nacimiento) : undefined} />
           <Row label="Ciudad" value={cliente?.cod_ciudad ? labels.ciudades.get(cliente.cod_ciudad) : undefined} />
           <Row label="Dirección" value={[cliente?.direccion, cliente?.nro_casa].filter(Boolean).join(" ")} />
-          <Row label="Vivienda" value={cliente?.vivienda} />
+          <Row label="Vivienda" value={cliente?.vivienda ? VIVIENDA[cliente.vivienda] ?? cliente.vivienda : undefined} />
         </div>
       </Card>
 
