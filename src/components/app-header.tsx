@@ -21,7 +21,7 @@ export function AppHeader() {
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link to="/dashboard" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          <img src="/logo.png" alt="Josias Muebles" className="h-9 w-9 rounded-lg bg-white object-contain p-0.5 ring-1 ring-border" />
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Josias Muebles" className="h-9 w-9 rounded-lg bg-white object-contain p-0.5 ring-1 ring-border" />
           Créditos
         </Link>
 

@@ -111,7 +111,7 @@ function LoginPage() {
       <div className="relative z-10 flex flex-col px-6 pt-16 text-primary-foreground lg:justify-center lg:px-16 lg:pt-0">
         <div className="mx-auto w-full max-w-md lg:mx-0 lg:max-w-lg">
           <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white/95 backdrop-blur-sm ring-1 ring-white/20 lg:h-16 lg:w-16">
-            <img src="/logo.png" alt="Josias Muebles" className="h-full w-full object-contain p-1.5" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Josias Muebles" className="h-full w-full object-contain p-1.5" />
           </div>
           <p className="mt-8 text-[11px] font-medium uppercase tracking-[0.28em] text-primary-foreground/70">
             Josias Muebles

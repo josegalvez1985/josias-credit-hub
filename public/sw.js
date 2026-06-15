@@ -3,8 +3,9 @@ const CACHE = "jm-cache-v1";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
+  const scope = self.registration.scope;
   event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(["/", "/manifest.webmanifest"]).catch(() => {})),
+    caches.open(CACHE).then((c) => c.addAll([scope, scope + "manifest.webmanifest"]).catch(() => {})),
   );
 });
 
@@ -23,6 +24,6 @@ self.addEventListener("fetch", (event) => {
         caches.open(CACHE).then((c) => c.put(request, copy)).catch(() => {});
         return res;
       })
-      .catch(() => caches.match(request).then((r) => r || caches.match("/"))),
+      .catch(() => caches.match(request).then((r) => r || caches.match(self.registration.scope))),
   );
 });

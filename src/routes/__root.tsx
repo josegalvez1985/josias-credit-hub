@@ -9,6 +9,8 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+
+const BASE = import.meta.env.BASE_URL;
 import { ThemeProvider } from "@/lib/theme";
 import { AuthProvider } from "@/lib/auth";
 import { ApplicationsProvider } from "@/lib/credit-applications";
@@ -26,7 +28,7 @@ function NotFoundComponent() {
         </p>
         <div className="mt-6">
           <a
-            href="/"
+            href={BASE}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Ir al inicio
@@ -61,7 +63,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             Intentar de nuevo
           </button>
           <a
-            href="/"
+            href={BASE}
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
             Ir al inicio
@@ -88,10 +90,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "manifest", href: "/manifest.webmanifest" },
-      { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32.png" },
-      { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16.png" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      { rel: "manifest", href: `${BASE}manifest.webmanifest` },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: `${BASE}favicon-32.png` },
+      { rel: "icon", type: "image/png", sizes: "16x16", href: `${BASE}favicon-16.png` },
+      { rel: "apple-touch-icon", href: `${BASE}apple-touch-icon.png` },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
