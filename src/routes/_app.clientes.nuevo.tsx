@@ -82,7 +82,11 @@ function NewClient() {
         </div>
       </header>
 
-      <form onSubmit={onSubmit} className="space-y-6">
+      <p className="text-xs text-muted-foreground">
+        Los campos con <span className="text-destructive">*</span> son obligatorios. El resto es opcional.
+      </p>
+
+      <form onSubmit={onSubmit} className="space-y-6" autoComplete="off">
         <Card className="space-y-5 p-6">
           <h2 className="font-display text-lg font-semibold">Datos personales</h2>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -123,17 +127,23 @@ function NewClient() {
             </Field>
             <Field label="Estado civil">
               <div className="flex flex-wrap gap-2">
-                {["Soltero", "Casado", "Divorciado", "Viudo", "Unión libre"].map((v) => (
+                {([
+                  ["S", "Soltero/a"],
+                  ["C", "Casado/a"],
+                  ["D", "Divorciado/a"],
+                  ["O", "Concubinado/a"],
+                  ["V", "Viudo/a"],
+                ] as const).map(([code, label]) => (
                   <button
-                    key={v}
+                    key={code}
                     type="button"
-                    onClick={() => update("estado_civil", v)}
+                    onClick={() => update("estado_civil", code)}
                     className={cn(
                       "rounded-md border px-3 py-2 text-sm transition-colors",
-                      form.estado_civil === v ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground",
+                      form.estado_civil === code ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground",
                     )}
                   >
-                    {v}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -159,7 +169,25 @@ function NewClient() {
               <Input value={form.direccion} onChange={(e) => update("direccion", e.target.value)} />
             </Field>
             <Field label="Vivienda">
-              <Input value={form.vivienda} onChange={(e) => update("vivienda", e.target.value)} placeholder="Ej: Propia, Alquilada" />
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["P", "Propia"],
+                  ["A", "Alquiler"],
+                  ["F", "Familiar"],
+                ] as const).map(([code, label]) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => update("vivienda", code)}
+                    className={cn(
+                      "rounded-md border px-3 py-2 text-sm transition-colors",
+                      form.vivienda === code ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </Field>
           </div>
         </Card>
@@ -182,7 +210,11 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <div className="space-y-1.5">
       <Label>
         {label}
-        {required && <span className="ml-0.5 text-destructive">*</span>}
+        {required ? (
+          <span className="ml-0.5 text-destructive">*</span>
+        ) : (
+          <span className="ml-1 text-xs font-normal text-muted-foreground">(opcional)</span>
+        )}
       </Label>
       {children}
     </div>

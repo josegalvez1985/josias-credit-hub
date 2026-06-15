@@ -155,15 +155,42 @@ export function listarClientes(q?: string) {
 }
 
 // Devuelve true si ya existe un cliente con ese CI.
+// El GET con ?q= devuelve 400 en este backend, así que traemos todo y filtramos local.
+// Algunos CI guardados tienen puntos (4.169.298) y otros no: normalizamos para comparar.
 export async function ciExiste(ci: string): Promise<boolean> {
-  const list = await listarClientes(ci);
-  return list.some((c) => (c.ci ?? "").trim() === ci.trim());
+  const norm = (v: string) => v.replace(/\D/g, "");
+  const target = norm(ci);
+  const list = await listarClientes();
+  return list.some((c) => norm(c.ci ?? "") === target);
 }
 
 export function crearCliente(c: ClienteInput) {
+  // El handler ORDS bindea las 16 columnas; si falta un bind en el JSON da 400.
+  // Enviamos todas las claves, con null donde no hay valor.
+  const num = (v: unknown) => (v === undefined || v === null || v === "" ? null : Number(v));
+  const str = (v: unknown) => (v === undefined || v === null || v === "" ? null : v);
+  const body = {
+    razon_social: c.razon_social,
+    nombre_fantasia: str(c.nombre_fantasia),
+    sexo: str(c.sexo),
+    ruc: str(c.ruc),
+    ci: str(c.ci),
+    nro_telefono: str(c.nro_telefono),
+    cod_pais: num(c.cod_pais),
+    cod_departamento: num(c.cod_departamento),
+    cod_ciudad: num(c.cod_ciudad),
+    direccion: str(c.direccion),
+    nro_casa: num(c.nro_casa),
+    estado: c.estado ?? "A",
+    estado_civil: str(c.estado_civil),
+    // ORDS hace TO_DATE(:fecha_nacimiento,'YYYY-MM-DD'); "" lanza ORA-01841 -> 400.
+    fecha_nacimiento: str(c.fecha_nacimiento),
+    vivienda: str(c.vivienda),
+    ubicacion: str(c.ubicacion),
+  };
   return request<{ cod_cliente: number }>("/clientes/", {
     method: "POST",
-    body: JSON.stringify(c),
+    body: JSON.stringify(body),
   });
 }
 
