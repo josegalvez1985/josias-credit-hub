@@ -2,6 +2,29 @@
 // This is a frontend-only demo: we register a credential and store its ID locally.
 
 const CRED_KEY = "jm-biometric-credential";
+const SECRET_KEY = "jm-biometric-secret";
+
+// Guarda credenciales (username/password) ofuscadas para reusarlas tras verificar
+// la huella. Nota: localStorage no es almacenamiento seguro; esto es ofuscación,
+// no cifrado fuerte. El acceso queda protegido por la verificación biométrica.
+export function storeBiometricSecret(username: string, password: string) {
+  const payload = btoa(unescape(encodeURIComponent(JSON.stringify({ username, password }))));
+  localStorage.setItem(SECRET_KEY, payload);
+}
+
+export function getBiometricSecret(): { username: string; password: string } | null {
+  const raw = localStorage.getItem(SECRET_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(decodeURIComponent(escape(atob(raw))));
+  } catch {
+    return null;
+  }
+}
+
+function clearBiometricSecret() {
+  localStorage.removeItem(SECRET_KEY);
+}
 
 export function isWebAuthnSupported() {
   return typeof window !== "undefined" && !!window.PublicKeyCredential;
@@ -26,7 +49,7 @@ export async function registerBiometric(userId: string, userName: string) {
   if (!isWebAuthnSupported()) throw new Error("WebAuthn no soportado en este dispositivo");
   const publicKey: PublicKeyCredentialCreationOptions = {
     challenge: randomBytes(32),
-    rp: { name: "Josias Muebles" },
+    rp: { name: "Créditos" },
     user: {
       id: new TextEncoder().encode(userId),
       name: userName,
@@ -57,6 +80,7 @@ export function hasRegisteredBiometric() {
 
 export function clearBiometric() {
   localStorage.removeItem(CRED_KEY);
+  clearBiometricSecret();
 }
 
 export async function verifyBiometric() {

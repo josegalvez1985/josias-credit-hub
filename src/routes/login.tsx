@@ -1,17 +1,22 @@
 import { createFileRoute, useNavigate, Navigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
-import { Eye, EyeOff, Loader2, Moon, Sun } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Eye, EyeOff, Fingerprint, Loader2, Moon, Sun } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  getBiometricSecret,
+  hasRegisteredBiometric,
+  verifyBiometric,
+} from "@/lib/webauthn";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Iniciar sesión — Josias Muebles" },
+      { title: "Iniciar sesión — Créditos" },
       { name: "description", content: "Accede a tu cuenta para gestionar solicitudes de crédito." },
     ],
   }),
@@ -26,8 +31,30 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioLoading, setBioLoading] = useState(false);
+
+  useEffect(() => {
+    setBioAvailable(hasRegisteredBiometric());
+  }, []);
 
   if (user) return <Navigate to="/dashboard" />;
+
+  async function onBiometricLogin() {
+    setBioLoading(true);
+    try {
+      await verifyBiometric();
+      const secret = getBiometricSecret();
+      if (!secret) throw new Error("No hay credenciales guardadas para biometría");
+      await login(secret.username, secret.password);
+      toast.success("Bienvenido");
+      navigate({ to: "/dashboard" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo iniciar con huella");
+    } finally {
+      setBioLoading(false);
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -57,14 +84,14 @@ function LoginPage() {
 
       <div className="relative mx-auto flex min-h-screen max-w-md flex-col px-6 pb-10 pt-16">
         <div className="text-primary-foreground">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm ring-1 ring-white/20">
-            <span className="font-display text-2xl font-semibold">J</span>
+          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white/95 backdrop-blur-sm ring-1 ring-white/20">
+            <img src="/logo.png" alt="Josias Muebles" className="h-full w-full object-contain p-1.5" />
           </div>
           <p className="mt-8 text-[11px] font-medium uppercase tracking-[0.28em] text-primary-foreground/70">
             Josias Muebles
           </p>
           <h1 className="mt-2 font-display text-4xl font-semibold leading-tight">
-            Solicitud<br />de Créditos
+            Accede a tu cuenta
           </h1>
           <p className="mt-3 max-w-sm text-sm text-primary-foreground/80">
             Bienvenido de nuevo. Inicia sesión para continuar gestionando las solicitudes de tus clientes.
@@ -120,6 +147,25 @@ function LoginPage() {
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Iniciar sesión"}
           </Button>
 
+          {bioAvailable && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onBiometricLogin}
+              disabled={bioLoading}
+              className="mt-3 h-11 w-full rounded-xl"
+            >
+              {bioLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Fingerprint className="h-4 w-4" />
+                  Entrar con huella
+                </>
+              )}
+            </Button>
+          )}
+
           <div className="mt-5 rounded-xl border border-dashed border-border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
             <p className="font-medium text-foreground">Cuentas de prueba</p>
             <p className="mt-1">
@@ -132,7 +178,7 @@ function LoginPage() {
         </form>
 
         <p className="mt-auto pt-6 text-center text-[11px] text-muted-foreground">
-          © {new Date().getFullYear()} Josias Muebles · Plataforma interna
+          © {new Date().getFullYear()} Plataforma interna
         </p>
       </div>
     </div>

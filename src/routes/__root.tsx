@@ -9,7 +9,6 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 import { ThemeProvider } from "@/lib/theme";
 import { AuthProvider } from "@/lib/auth";
 import { ApplicationsProvider } from "@/lib/credit-applications";
@@ -40,9 +39,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -80,11 +76,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#2d1f17" },
-      { title: "Josias Muebles — Solicitud de Créditos" },
-      { name: "description", content: "Gestiona y solicita créditos para muebles de manera rápida, moderna y segura." },
-      { name: "author", content: "Josias Muebles" },
-      { property: "og:title", content: "Josias Muebles — Solicitud de Créditos" },
+      { name: "theme-color", content: "#1f3a8a" },
+      { title: "Solicitud de Créditos" },
+      { name: "description", content: "Gestiona y solicita créditos de manera rápida y segura." },
+      { name: "author", content: "Equipo de crédito" },
+      { property: "og:title", content: "Solicitud de Créditos" },
       { property: "og:description", content: "App para asesores: registra y administra solicitudes de crédito." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -92,6 +88,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32.png" },
+      { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16.png" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

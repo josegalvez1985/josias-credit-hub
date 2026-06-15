@@ -1,25 +1,25 @@
 {
-  "name": "Josias Muebles — Solicitud de Créditos",
-  "short_name": "Josias Créditos",
-  "description": "Solicita y gestiona créditos para muebles de manera rápida y segura.",
+  "name": "Solicitud de Créditos",
+  "short_name": "Créditos",
+  "description": "Solicita y gestiona créditos de manera rápida y segura.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f7f2e9",
-  "theme_color": "#2d1f17",
+  "background_color": "#eef2fb",
+  "theme_color": "#1f3a8a",
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

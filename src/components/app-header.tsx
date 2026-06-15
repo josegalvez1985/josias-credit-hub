@@ -20,14 +20,9 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link to="/dashboard" className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-wood text-primary-foreground shadow-elegant">
-            <span className="font-display text-lg font-semibold">J</span>
-          </div>
-          <div className="hidden flex-col leading-tight sm:flex">
-            <span className="font-display text-sm font-semibold tracking-tight">Josias Muebles</span>
-            <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Créditos</span>
-          </div>
+        <Link to="/dashboard" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <img src="/logo.png" alt="Josias Muebles" className="h-9 w-9 rounded-lg bg-white object-contain p-0.5 ring-1 ring-border" />
+          Créditos
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">

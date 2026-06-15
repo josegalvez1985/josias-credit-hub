@@ -6,16 +6,19 @@ export type User = {
   email: string;
   username: string;
   role: "asesor" | "supervisor";
+  token?: string;
   avatar?: string;
   biometricEnabled?: boolean;
 };
+
+const API_URL = import.meta.env.VITE_API_URL as string | undefined;
 
 // Mock users database
 export const MOCK_USERS: Array<User & { password: string }> = [
   {
     id: "1",
     name: "María González",
-    email: "maria@josiasmuebles.com",
+    email: "maria@example.com",
     username: "maria",
     password: "demo123",
     role: "asesor",
@@ -23,7 +26,7 @@ export const MOCK_USERS: Array<User & { password: string }> = [
   {
     id: "2",
     name: "Carlos Ramírez",
-    email: "carlos@josiasmuebles.com",
+    email: "carlos@example.com",
     username: "carlos",
     password: "demo123",
     role: "supervisor",
@@ -42,6 +45,16 @@ type AuthCtx = {
 const Ctx = createContext<AuthCtx | null>(null);
 
 const STORAGE_KEY = "jm-auth-user";
+
+export function getStoredToken(): string | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return (JSON.parse(raw) as User).token ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -62,13 +75,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (username: string, password: string) => {
-    await new Promise((r) => setTimeout(r, 600));
-    const found = MOCK_USERS.find(
-      (u) => (u.username === username || u.email === username) && u.password === password,
-    );
-    if (!found) throw new Error("Usuario o contraseña incorrectos");
-    const { password: _p, ...safe } = found;
-    persist(safe);
+    // Sin API configurada: login mock para desarrollo
+    if (!API_URL) {
+      await new Promise((r) => setTimeout(r, 600));
+      const found = MOCK_USERS.find(
+        (u) => (u.username === username || u.email === username) && u.password === password,
+      );
+      if (!found) throw new Error("Usuario o contraseña incorrectos");
+      const { password: _p, ...safe } = found;
+      persist(safe);
+      return;
+    }
+
+    const normalizedUsername = username.trim().toUpperCase();
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: normalizedUsername, password }),
+      });
+    } catch {
+      throw new Error("No se pudo conectar con el servidor");
+    }
+
+    let data: { success?: boolean; token?: string; username?: string; message?: string } = {};
+    try {
+      data = await res.json();
+    } catch {}
+
+    if (res.status === 401 || data.success === false) {
+      throw new Error(data.message || "Usuario o contraseña incorrectos");
+    }
+    if (!res.ok || !data.token) {
+      throw new Error(data.message || "Error al iniciar sesión");
+    }
+
+    const name = data.username ?? username;
+    persist({
+      id: name,
+      name,
+      email: "",
+      username: name,
+      role: "asesor",
+      token: data.token,
+    });
   };
 
   const logout = () => persist(null);
@@ -79,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const changePassword = async (current: string, next: string) => {
+    if (API_URL) throw new Error("Cambio de contraseña no disponible aún");
     await new Promise((r) => setTimeout(r, 400));
     if (!user) throw new Error("No hay sesión");
     const found = MOCK_USERS.find((u) => u.id === user.id);

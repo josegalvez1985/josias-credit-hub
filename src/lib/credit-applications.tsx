@@ -134,5 +134,5 @@ export const STATUS_LABEL: Record<ApplicationStatus, string> = {
 };
 
 export function formatCurrency(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG", maximumFractionDigits: 0 }).format(n);
 }

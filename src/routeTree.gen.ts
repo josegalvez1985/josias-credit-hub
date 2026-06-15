@@ -17,6 +17,8 @@ import { Route as AppPerfilRouteImport } from './routes/_app.perfil'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppSolicitudesIndexRouteImport } from './routes/_app.solicitudes.index'
 import { Route as AppSolicitudesNuevaRouteImport } from './routes/_app.solicitudes.nueva'
+import { Route as AppSolicitudesIdRouteImport } from './routes/_app.solicitudes.$id'
+import { Route as AppClientesNuevoRouteImport } from './routes/_app.clientes.nuevo'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -57,6 +59,16 @@ const AppSolicitudesNuevaRoute = AppSolicitudesNuevaRouteImport.update({
   path: '/solicitudes/nueva',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSolicitudesIdRoute = AppSolicitudesIdRouteImport.update({
+  id: '/solicitudes/$id',
+  path: '/solicitudes/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientesNuevoRoute = AppClientesNuevoRouteImport.update({
+  id: '/clientes/nuevo',
+  path: '/clientes/nuevo',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -64,6 +76,8 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/dashboard': typeof AppDashboardRoute
   '/perfil': typeof AppPerfilRoute
+  '/clientes/nuevo': typeof AppClientesNuevoRoute
+  '/solicitudes/$id': typeof AppSolicitudesIdRoute
   '/solicitudes/nueva': typeof AppSolicitudesNuevaRoute
   '/solicitudes/': typeof AppSolicitudesIndexRoute
 }
@@ -73,6 +87,8 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/dashboard': typeof AppDashboardRoute
   '/perfil': typeof AppPerfilRoute
+  '/clientes/nuevo': typeof AppClientesNuevoRoute
+  '/solicitudes/$id': typeof AppSolicitudesIdRoute
   '/solicitudes/nueva': typeof AppSolicitudesNuevaRoute
   '/solicitudes': typeof AppSolicitudesIndexRoute
 }
@@ -84,6 +100,8 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/perfil': typeof AppPerfilRoute
+  '/_app/clientes/nuevo': typeof AppClientesNuevoRoute
+  '/_app/solicitudes/$id': typeof AppSolicitudesIdRoute
   '/_app/solicitudes/nueva': typeof AppSolicitudesNuevaRoute
   '/_app/solicitudes/': typeof AppSolicitudesIndexRoute
 }
@@ -95,6 +113,8 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/dashboard'
     | '/perfil'
+    | '/clientes/nuevo'
+    | '/solicitudes/$id'
     | '/solicitudes/nueva'
     | '/solicitudes/'
   fileRoutesByTo: FileRoutesByTo
@@ -104,6 +124,8 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/dashboard'
     | '/perfil'
+    | '/clientes/nuevo'
+    | '/solicitudes/$id'
     | '/solicitudes/nueva'
     | '/solicitudes'
   id:
@@ -114,6 +136,8 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/_app/dashboard'
     | '/_app/perfil'
+    | '/_app/clientes/nuevo'
+    | '/_app/solicitudes/$id'
     | '/_app/solicitudes/nueva'
     | '/_app/solicitudes/'
   fileRoutesById: FileRoutesById
@@ -183,12 +207,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSolicitudesNuevaRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/solicitudes/$id': {
+      id: '/_app/solicitudes/$id'
+      path: '/solicitudes/$id'
+      fullPath: '/solicitudes/$id'
+      preLoaderRoute: typeof AppSolicitudesIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clientes/nuevo': {
+      id: '/_app/clientes/nuevo'
+      path: '/clientes/nuevo'
+      fullPath: '/clientes/nuevo'
+      preLoaderRoute: typeof AppClientesNuevoRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppPerfilRoute: typeof AppPerfilRoute
+  AppClientesNuevoRoute: typeof AppClientesNuevoRoute
+  AppSolicitudesIdRoute: typeof AppSolicitudesIdRoute
   AppSolicitudesNuevaRoute: typeof AppSolicitudesNuevaRoute
   AppSolicitudesIndexRoute: typeof AppSolicitudesIndexRoute
 }
@@ -196,6 +236,8 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppPerfilRoute: AppPerfilRoute,
+  AppClientesNuevoRoute: AppClientesNuevoRoute,
+  AppSolicitudesIdRoute: AppSolicitudesIdRoute,
   AppSolicitudesNuevaRoute: AppSolicitudesNuevaRoute,
   AppSolicitudesIndexRoute: AppSolicitudesIndexRoute,
 }
@@ -211,3 +253,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

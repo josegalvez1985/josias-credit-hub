@@ -13,13 +13,14 @@ import {
   hasRegisteredBiometric,
   isPlatformAuthenticatorAvailable,
   registerBiometric,
+  storeBiometricSecret,
 } from "@/lib/webauthn";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/perfil")({
   head: () => ({
     meta: [
-      { title: "Perfil — Josias Muebles" },
+      { title: "Perfil — Créditos" },
       { name: "description", content: "Configura tu cuenta, contraseña y biometría." },
     ],
   }),
@@ -39,6 +40,8 @@ function ProfilePage() {
   const [bioAvailable, setBioAvailable] = useState(false);
   const [bioEnabled, setBioEnabled] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
+  const [bioPassword, setBioPassword] = useState("");
+  const [bioPromptOpen, setBioPromptOpen] = useState(false);
 
   useEffect(() => {
     isPlatformAuthenticatorAvailable().then(setBioAvailable);
@@ -67,21 +70,32 @@ function ProfilePage() {
     }
   }
 
-  async function onToggleBiometric(enabled: boolean) {
+  function onToggleBiometric(enabled: boolean) {
     if (!user) return;
+    if (enabled) {
+      // Necesitamos la contraseña para reusarla al iniciar sesión con huella
+      setBioPassword("");
+      setBioPromptOpen(true);
+      return;
+    }
+    clearBiometric();
+    setBioEnabled(false);
+    updateUser({ biometricEnabled: false });
+    toast.success("Biometría deshabilitada");
+  }
+
+  async function onConfirmBiometric(e: FormEvent) {
+    e.preventDefault();
+    if (!user || !bioPassword) return;
     setBioLoading(true);
     try {
-      if (enabled) {
-        await registerBiometric(user.id, user.name);
-        setBioEnabled(true);
-        updateUser({ biometricEnabled: true });
-        toast.success("Biometría habilitada en este dispositivo");
-      } else {
-        clearBiometric();
-        setBioEnabled(false);
-        updateUser({ biometricEnabled: false });
-        toast.success("Biometría deshabilitada");
-      }
+      await registerBiometric(user.username, user.name);
+      storeBiometricSecret(user.username, bioPassword);
+      setBioEnabled(true);
+      updateUser({ biometricEnabled: true });
+      setBioPromptOpen(false);
+      setBioPassword("");
+      toast.success("Biometría habilitada en este dispositivo");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo configurar la biometría");
     } finally {
@@ -174,6 +188,35 @@ function ProfilePage() {
             )}
           </div>
         </div>
+
+        {bioPromptOpen && (
+          <form onSubmit={onConfirmBiometric} className="mt-5 border-t border-border pt-5">
+            <Label htmlFor="bioPassword">Confirma tu contraseña para activar</Label>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Se guardará de forma segura en este dispositivo para iniciar sesión con tu huella.
+            </p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+              <Input
+                id="bioPassword"
+                type="password"
+                value={bioPassword}
+                onChange={(e) => setBioPassword(e.target.value)}
+                autoComplete="current-password"
+                placeholder="Contraseña actual"
+                required
+                className="flex-1"
+              />
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => setBioPromptOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={bioLoading || !bioPassword} className="bg-primary text-primary-foreground hover:opacity-90">
+                  {bioLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Activar"}
+                </Button>
+              </div>
+            </div>
+          </form>
+        )}
       </Card>
 
       {/* Cambio de contraseña */}
