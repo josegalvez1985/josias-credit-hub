@@ -177,6 +177,7 @@ function NewClient() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Ciudad" required>
               <AsyncCombobox
+                title="Ciudad"
                 value={ciudad?.value ?? null}
                 label={ciudad?.label ?? null}
                 fetcher={lov.ciudades}

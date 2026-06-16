@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowUpRight, FilePlus, FileText, Sparkles, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency } from "@/lib/credit-applications";
-import { listarCabeceras, type Cabecera } from "@/lib/api";
+import { listarCabeceras, nombresClientes, type Cabecera } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined;
@@ -21,6 +21,7 @@ export const Route = createFileRoute("/_app/dashboard")({
 function Dashboard() {
   const { user } = useAuth();
   const [items, setItems] = useState<Cabecera[]>([]);
+  const [nombres, setNombres] = useState<Map<number, string>>(new Map());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,7 +30,14 @@ function Dashboard() {
       return;
     }
     listarCabeceras()
-      .then(setItems)
+      .then(async (cabs) => {
+        setItems(cabs);
+        try {
+          setNombres(await nombresClientes(cabs.slice(0, 4).map((c) => c.cod_cliente)));
+        } catch {
+          /* nombres opcionales */
+        }
+      })
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, []);
@@ -117,7 +125,7 @@ function Dashboard() {
                       )}
                     </div>
                     <p className="truncate text-sm text-muted-foreground">
-                      {a.referencia || `Cliente ${a.cod_cliente}`}
+                      {nombres.get(a.cod_cliente) || a.referencia || `Cliente ${a.cod_cliente}`}
                     </p>
                     <div className="mt-1 flex items-baseline gap-2">
                       <p className="font-display text-base font-semibold">{formatCurrency(a.total)}</p>

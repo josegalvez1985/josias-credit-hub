@@ -51,9 +51,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export type LovItem = { value: number; label: string; [k: string]: unknown };
 type OrdsFeed<T> = { items: T[] };
 
-function feed<T>(path: string, q?: string) {
-  const qs = q ? `?q=${encodeURIComponent(q)}` : "";
-  return request<OrdsFeed<T>>(`${path}${qs}`).then((r) => r.items ?? []);
+// Trae TODAS las páginas de un feed ORDS (pagina de 25 por defecto).
+async function feed<T>(path: string, q?: string): Promise<T[]> {
+  const out: T[] = [];
+  let offset = 0;
+  for (;;) {
+    const sep = path.includes("?") ? "&" : "?";
+    const qParam = q ? `&q=${encodeURIComponent(q)}` : "";
+    const f = await request<OrdsFeed<T> & { hasMore?: boolean }>(
+      `${path}${sep}limit=500&offset=${offset}${qParam}`,
+    );
+    const items = f.items ?? [];
+    out.push(...items);
+    if (!f.hasMore || items.length === 0) break;
+    offset += items.length;
+  }
+  return out;
 }
 
 type ClienteLov = LovItem & { nombre_fantasia?: string; ci?: string; ruc?: string };

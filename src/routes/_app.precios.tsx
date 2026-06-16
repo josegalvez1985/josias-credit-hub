@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Search, Tag, Loader2, AlertCircle, RefreshCw } from "lucide-react";
-import { listarPrecios, type PrecioVenta } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Tag, Loader2, AlertCircle, RefreshCw, X } from "lucide-react";
+import { listarPrecios, type LovItem, type PrecioVenta } from "@/lib/api";
 import { formatCurrency } from "@/lib/credit-applications";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AsyncCombobox } from "@/components/async-combobox";
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined;
 
@@ -23,8 +23,8 @@ function PreciosPage() {
   const [items, setItems] = useState<PrecioVenta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [cuotas, setCuotas] = useState("");
+  const [articulo, setArticulo] = useState<{ value: number; label: string } | null>(null);
+  const [cuotas, setCuotas] = useState<{ value: number; label: string } | null>(null);
 
   function load() {
     if (!API_URL) {
@@ -50,21 +50,44 @@ function PreciosPage() {
 
   useEffect(load, []);
 
-  const opcionesCuotas = useMemo(
-    () => [...new Set(items.map((i) => i.cantidad_cuotas))].sort((a, b) => a - b),
+  // LOV de artículos (únicos) desde los datos cargados; busca por nombre o código.
+  const fetchArticulos = useCallback(
+    async (q?: string): Promise<LovItem[]> => {
+      const vistos = new Map<number, string>();
+      for (const i of items) if (!vistos.has(i.cod_articulo)) vistos.set(i.cod_articulo, i.nombre_articulo);
+      const term = (q ?? "").trim().toLowerCase();
+      const qd = term.replace(/\D/g, "");
+      return [...vistos.entries()]
+        .filter(([cod, nombre]) =>
+          !term || nombre.toLowerCase().includes(term) || (qd ? String(cod).includes(qd) : false),
+        )
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([value, label]) => ({ value, label }));
+    },
     [items],
   );
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const qd = q.replace(/\D/g, "");
-    return items.filter((i) => {
-      if (cuotas && String(i.cantidad_cuotas) !== cuotas) return false;
-      if (!q) return true;
-      if (i.nombre_articulo.toLowerCase().includes(q)) return true;
-      return qd ? String(i.cod_articulo).includes(qd) : false;
-    });
-  }, [items, query, cuotas]);
+  // LOV de cuotas (valores únicos).
+  const fetchCuotas = useCallback(
+    async (q?: string): Promise<LovItem[]> => {
+      const term = (q ?? "").trim();
+      return [...new Set(items.map((i) => i.cantidad_cuotas))]
+        .sort((a, b) => a - b)
+        .filter((c) => !term || String(c).includes(term))
+        .map((c) => ({ value: c, label: `${c} cuotas` }));
+    },
+    [items],
+  );
+
+  const filtered = useMemo(
+    () =>
+      items.filter(
+        (i) =>
+          (!articulo || i.cod_articulo === articulo.value) &&
+          (!cuotas || i.cantidad_cuotas === cuotas.value),
+      ),
+    [items, articulo, cuotas],
+  );
 
   return (
     <div className="space-y-6">
@@ -83,25 +106,40 @@ function PreciosPage() {
       </header>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar artículo por nombre o código..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="h-11 rounded-full bg-card pl-10"
-          />
+        <div className="flex flex-1 items-center gap-2">
+          <div className="flex-1">
+            <AsyncCombobox
+              title="Artículo"
+              placeholder="Todos los artículos"
+              value={articulo?.value ?? null}
+              label={articulo?.label ?? null}
+              fetcher={fetchArticulos}
+              onSelect={(it) => setArticulo({ value: it.value, label: it.label })}
+            />
+          </div>
+          {articulo && (
+            <Button variant="ghost" size="icon" onClick={() => setArticulo(null)} aria-label="Quitar artículo" className="shrink-0 rounded-full">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
-        <select
-          value={cuotas}
-          onChange={(e) => setCuotas(e.target.value)}
-          className="h-11 rounded-full border border-input bg-card px-4 text-sm sm:w-48"
-        >
-          <option value="">Todas las cuotas</option>
-          {opcionesCuotas.map((c) => (
-            <option key={c} value={c}>{c} cuotas</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2 sm:w-56">
+          <div className="flex-1">
+            <AsyncCombobox
+              title="Cantidad de cuotas"
+              placeholder="Todas las cuotas"
+              value={cuotas?.value ?? null}
+              label={cuotas?.label ?? null}
+              fetcher={fetchCuotas}
+              onSelect={(it) => setCuotas({ value: it.value, label: it.label })}
+            />
+          </div>
+          {cuotas && (
+            <Button variant="ghost" size="icon" onClick={() => setCuotas(null)} aria-label="Quitar cuotas" className="shrink-0 rounded-full">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -131,8 +169,8 @@ function PreciosPage() {
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
           {filtered.map((p) => (
-            <Card key={`${p.cod_articulo}-${p.id_lista_precio}`} className="p-5">
-              <div className="flex items-start justify-between gap-3">
+            <Card key={`${p.cod_articulo}-${p.id_lista_precio}`} className="overflow-hidden p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate font-medium">{p.nombre_articulo}</p>
                   <p className="font-mono text-[10px] text-muted-foreground">#{p.cod_articulo}</p>
@@ -142,14 +180,14 @@ function PreciosPage() {
                 </span>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:gap-3">
                 <Stat label="Precio base" value={formatCurrency(p.precio_unitario)} />
                 <Stat label={`Con recargo (${p.porcentaje}%)`} value={formatCurrency(p.precio_con_recargo)} />
               </div>
 
-              <div className="mt-3 flex items-center justify-between rounded-xl bg-muted px-4 py-3">
-                <span className="text-sm font-medium">{p.cantidad_cuotas} cuotas</span>
-                <span className="font-display text-lg font-semibold">
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-muted px-3 py-3 sm:px-4">
+                <span className="shrink-0 text-sm font-medium">{p.cantidad_cuotas} cuotas</span>
+                <span className="min-w-0 truncate text-right font-display text-base font-semibold sm:text-lg">
                   {p.valor_cuota != null ? `${formatCurrency(p.valor_cuota)}/mes` : "—"}
                 </span>
               </div>
@@ -163,9 +201,9 @@ function PreciosPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-medium">{value}</p>
+    <div className="min-w-0">
+      <p className="text-xs leading-tight text-muted-foreground">{label}</p>
+      <p className="mt-0.5 break-words font-medium tabular-nums">{value}</p>
     </div>
   );
 }

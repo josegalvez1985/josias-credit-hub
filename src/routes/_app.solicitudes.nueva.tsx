@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -17,10 +17,12 @@ import {
 import { formatCurrency } from "@/lib/credit-applications";
 import {
   crearSolicitud,
+  listarPrecios,
   lov,
   type DetalleInput,
   type ReferenciaInput,
   type LovItem,
+  type PrecioVenta,
 } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,7 +52,7 @@ const STEPS = [
   { key: "resumen", label: "Resumen", icon: ClipboardCheck },
 ] as const;
 
-type DetalleRow = DetalleInput & { label: string };
+type DetalleRow = DetalleInput & { label: string; precio_base: number };
 
 // Formatea un string de dígitos con separador de miles (es-PY usa punto). "" si vacío.
 const fmtMiles = (v: string) => {
@@ -70,7 +72,6 @@ function NewApplication() {
   const [fechaFactura, setFechaFactura] = useState(() => new Date().toISOString().slice(0, 10));
   const [cantidadCuotas, setCantidadCuotas] = useState("12");
   const [entregaInicial, setEntregaInicial] = useState("");
-  const [porcInteres, setPorcInteres] = useState("0");
   const [fecVencInicial, setFecVencInicial] = useState("");
 
   // ---- Detalle (artículos)
@@ -78,6 +79,53 @@ function NewApplication() {
   const [artSel, setArtSel] = useState<{ value: number; label: string } | null>(null);
   const [artCantidad, setArtCantidad] = useState("1");
   const [artPrecio, setArtPrecio] = useState("");
+
+  // ---- Precios (V_PRECIOS_VENTAS): se cargan una vez y se indexan por artículo.
+  const [precios, setPrecios] = useState<PrecioVenta[]>([]);
+  const preciosPorArt = useMemo(() => {
+    const m = new Map<number, PrecioVenta[]>();
+    for (const p of precios) {
+      const arr = m.get(p.cod_articulo) ?? [];
+      arr.push(p);
+      m.set(p.cod_articulo, arr);
+    }
+    return m;
+  }, [precios]);
+
+  useEffect(() => {
+    listarPrecios().then(setPrecios).catch(() => {});
+  }, []);
+
+  // LOV de artículos (únicos, con precio) filtrando localmente por nombre o código.
+  const fetchArticulos = useCallback(
+    async (q?: string): Promise<LovItem[]> => {
+      const vistos = new Map<number, string>();
+      for (const p of precios) if (!vistos.has(p.cod_articulo)) vistos.set(p.cod_articulo, p.nombre_articulo);
+      const term = (q ?? "").trim().toLowerCase();
+      const qd = term.replace(/\D/g, "");
+      return [...vistos.entries()]
+        .filter(([cod, nombre]) =>
+          !term || nombre.toLowerCase().includes(term) || (qd ? String(cod).includes(qd) : false),
+        )
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([value, label]) => ({ value, label }));
+    },
+    [precios],
+  );
+
+  // Filas de precio del artículo seleccionado (para autocompletar precio base).
+  const filasArtSel = artSel ? preciosPorArt.get(artSel.value) ?? [] : [];
+  const precioBaseArtSel = filasArtSel[0]?.precio_unitario ?? 0;
+
+  // Opciones de cuotas/recargo de la solicitud: las define el primer artículo agregado.
+  const planArt = detalles[0] ? preciosPorArt.get(detalles[0].cod_articulo) ?? [] : [];
+  const opcionesCuotas = useMemo(
+    () =>
+      [...new Map(planArt.map((p) => [p.cantidad_cuotas, p.porcentaje])).entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([cuotas, porcentaje]) => ({ cuotas, porcentaje })),
+    [planArt],
+  );
 
   // ---- Actividad laboral
   const [actEnabled, setActEnabled] = useState(false);
@@ -100,24 +148,40 @@ function NewApplication() {
   const [refRow, setRefRow] = useState<ReferenciaInput>({ relacion: "", telefono: "", nombre_apellido: "" });
 
   // ---- Cálculos
-  const total = useMemo(
-    () => detalles.reduce((s, d) => s + d.cantidad * d.precio_unitario, 0),
-    [detalles],
-  );
   const cuotas = Number(cantidadCuotas) || 1;
   const entrega = Number(entregaInicial.replace(/\D/g, "")) || 0;
-  const interes = Number(porcInteres) || 0;
+  // El % de recargo lo define la cuota elegida (del plan del primer artículo).
+  const interes = opcionesCuotas.find((o) => o.cuotas === cuotas)?.porcentaje ?? 0;
+
+  // precio_unitario por línea = precio base + recargo de la cuota elegida.
+  const conRecargo = (base: number) => Math.round(base * (1 + interes / 100));
+  const total = useMemo(
+    () => detalles.reduce((s, d) => s + d.cantidad * conRecargo(d.precio_base), 0),
+    [detalles, interes],
+  );
   const montoCuota = useMemo(() => {
-    const base = Math.max(total - entrega, 0) * (1 + interes / 100);
+    const base = Math.max(total - entrega, 0);
     return cuotas > 0 ? Math.round(base / cuotas) : 0;
-  }, [total, entrega, interes, cuotas]);
+  }, [total, entrega, cuotas]);
+
+  // Cuando hay plan de cuotas, fija la cantidad de cuotas a una opción válida.
+  useEffect(() => {
+    if (opcionesCuotas.length && !opcionesCuotas.some((o) => o.cuotas === cuotas)) {
+      setCantidadCuotas(String(opcionesCuotas[0].cuotas));
+    }
+  }, [opcionesCuotas]);
+
+  // Autocompleta el precio (base) al elegir un artículo.
+  useEffect(() => {
+    if (artSel) setArtPrecio(precioBaseArtSel ? Number(precioBaseArtSel).toLocaleString("es-PY") : "");
+  }, [artSel, precioBaseArtSel]);
 
   function addDetalle() {
     if (!artSel) return toast.error("Selecciona un artículo");
     const cantidad = Number(artCantidad) || 0;
     const precio = Number(artPrecio.replace(/\D/g, "")) || 0;
     if (cantidad <= 0 || precio <= 0) return toast.error("Cantidad y precio deben ser mayores a 0");
-    setDetalles((d) => [...d, { cod_articulo: artSel.value, cantidad, precio_unitario: precio, label: artSel.label }]);
+    setDetalles((d) => [...d, { cod_articulo: artSel.value, cantidad, precio_unitario: precio, precio_base: precio, label: artSel.label }]);
     setArtSel(null);
     setArtCantidad("1");
     setArtPrecio("");
@@ -155,9 +219,12 @@ function NewApplication() {
           cod_vendedor: vendedor.value,
           fec_vencimiento_inicial: fecVencInicial || fechaFactura,
           entrega_inicial: entrega,
-          porc_interes: interes,
+          porc_interes: 0, // el recargo ya está incluido en el precio_unitario
         },
-        detalles: detalles.map(({ label: _l, ...d }) => d),
+        detalles: detalles.map(({ label: _l, precio_base, ...d }) => ({
+          ...d,
+          precio_unitario: conRecargo(precio_base),
+        })),
         referencias,
         actividad:
           actEnabled && actProfesion && actCiudad
@@ -211,6 +278,7 @@ function NewApplication() {
           <div className="space-y-4">
             <Field label="Cliente" required>
               <AsyncCombobox
+                title="Cliente"
                 value={cliente?.value ?? null}
                 label={cliente?.label ?? null}
                 placeholder="Buscar por nombre, CI o RUC..."
@@ -239,6 +307,7 @@ function NewApplication() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Ciudad" required>
                 <AsyncCombobox
+                  title="Ciudad"
                   value={ciudad?.value ?? null}
                   label={ciudad?.label ?? null}
                   fetcher={lov.ciudades}
@@ -247,6 +316,7 @@ function NewApplication() {
               </Field>
               <Field label="Vendedor" required>
                 <AsyncCombobox
+                  title="Vendedor"
                   value={vendedor?.value ?? null}
                   label={vendedor?.label ?? null}
                   fetcher={lov.vendedores}
@@ -269,9 +339,10 @@ function NewApplication() {
             <div className="rounded-xl border border-dashed border-border p-4">
               <Field label="Artículo">
                 <AsyncCombobox
+                  title="Artículo"
                   value={artSel?.value ?? null}
                   label={artSel?.label ?? null}
-                  fetcher={lov.articulos}
+                  fetcher={fetchArticulos}
                   onSelect={(it) => setArtSel({ value: it.value, label: it.label })}
                 />
               </Field>
@@ -293,14 +364,21 @@ function NewApplication() {
             ) : (
               <div className="space-y-2">
                 {detalles.map((d, i) => (
-                  <div key={i} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                  <div key={i} className="flex items-start gap-3 rounded-xl border border-border p-3">
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{d.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {d.cantidad} × {formatCurrency(d.precio_unitario)}
+                      <p className="text-xs leading-snug text-muted-foreground">
+                        {d.cantidad} × {formatCurrency(conRecargo(d.precio_base))}
+                        {interes > 0 && (
+                          <span className="ml-1 block sm:inline">
+                            (base {formatCurrency(d.precio_base)} +{interes}%)
+                          </span>
+                        )}
                       </p>
                     </div>
-                    <p className="font-display font-semibold">{formatCurrency(d.cantidad * d.precio_unitario)}</p>
+                    <p className="shrink-0 whitespace-nowrap text-right font-display font-semibold">
+                      {formatCurrency(d.cantidad * conRecargo(d.precio_base))}
+                    </p>
                     <button
                       type="button"
                       onClick={() => setDetalles((arr) => arr.filter((_, idx) => idx !== i))}
@@ -323,18 +401,25 @@ function NewApplication() {
                 <select
                   value={cantidadCuotas}
                   onChange={(e) => setCantidadCuotas(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm"
+                  disabled={opcionesCuotas.length === 0}
+                  className="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm disabled:opacity-50"
                 >
-                  {[3, 6, 12, 18, 24, 36].map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
+                  {opcionesCuotas.length === 0 ? (
+                    <option value="">Agregá un artículo</option>
+                  ) : (
+                    opcionesCuotas.map((o) => (
+                      <option key={o.cuotas} value={o.cuotas}>
+                        {o.cuotas} cuotas {o.porcentaje > 0 ? `(+${o.porcentaje}%)` : ""}
+                      </option>
+                    ))
+                  )}
                 </select>
               </Field>
               <Field label="Entrega inicial">
                 <Input type="text" value={entregaInicial} onChange={(e) => setEntregaInicial(fmtMiles(e.target.value))} inputMode="numeric" />
               </Field>
-              <Field label="% Interés">
-                <Input type="number" min={0} step="0.01" value={porcInteres} onChange={(e) => setPorcInteres(e.target.value)} inputMode="decimal" />
+              <Field label="% Recargo">
+                <Input value={`${interes}%`} readOnly disabled className="bg-muted" />
               </Field>
             </div>
 
@@ -405,6 +490,7 @@ function NewApplication() {
                   </Field>
                   <Field label="Profesión">
                     <AsyncCombobox
+                      title="Profesión"
                       value={actProfesion?.value ?? null}
                       label={actProfesion?.label ?? null}
                       fetcher={lov.profesiones}
@@ -413,6 +499,7 @@ function NewApplication() {
                   </Field>
                   <Field label="Ciudad laboral">
                     <AsyncCombobox
+                      title="Ciudad laboral"
                       value={actCiudad?.value ?? null}
                       label={actCiudad?.label ?? null}
                       fetcher={lov.ciudades}
