@@ -52,6 +52,12 @@ const STEPS = [
 
 type DetalleRow = DetalleInput & { label: string };
 
+// Formatea un string de dígitos con separador de miles (es-PY usa punto). "" si vacío.
+const fmtMiles = (v: string) => {
+  const d = v.replace(/\D/g, "");
+  return d ? Number(d).toLocaleString("es-PY") : "";
+};
+
 function NewApplication() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
@@ -99,7 +105,7 @@ function NewApplication() {
     [detalles],
   );
   const cuotas = Number(cantidadCuotas) || 1;
-  const entrega = Number(entregaInicial) || 0;
+  const entrega = Number(entregaInicial.replace(/\D/g, "")) || 0;
   const interes = Number(porcInteres) || 0;
   const montoCuota = useMemo(() => {
     const base = Math.max(total - entrega, 0) * (1 + interes / 100);
@@ -109,7 +115,7 @@ function NewApplication() {
   function addDetalle() {
     if (!artSel) return toast.error("Selecciona un artículo");
     const cantidad = Number(artCantidad) || 0;
-    const precio = Number(artPrecio) || 0;
+    const precio = Number(artPrecio.replace(/\D/g, "")) || 0;
     if (cantidad <= 0 || precio <= 0) return toast.error("Cantidad y precio deben ser mayores a 0");
     setDetalles((d) => [...d, { cod_articulo: artSel.value, cantidad, precio_unitario: precio, label: artSel.label }]);
     setArtSel(null);
@@ -274,7 +280,7 @@ function NewApplication() {
                   <Input type="number" min={1} value={artCantidad} onChange={(e) => setArtCantidad(e.target.value)} inputMode="numeric" />
                 </Field>
                 <Field label="Precio unitario">
-                  <Input type="number" min={0} value={artPrecio} onChange={(e) => setArtPrecio(e.target.value)} inputMode="numeric" />
+                  <Input type="text" value={artPrecio} onChange={(e) => setArtPrecio(fmtMiles(e.target.value))} inputMode="numeric" />
                 </Field>
                 <Button type="button" onClick={addDetalle} className="col-span-2 sm:col-span-1">
                   <Plus className="h-4 w-4" /> Agregar
@@ -325,7 +331,7 @@ function NewApplication() {
                 </select>
               </Field>
               <Field label="Entrega inicial">
-                <Input type="number" min={0} value={entregaInicial} onChange={(e) => setEntregaInicial(e.target.value)} inputMode="numeric" />
+                <Input type="text" value={entregaInicial} onChange={(e) => setEntregaInicial(fmtMiles(e.target.value))} inputMode="numeric" />
               </Field>
               <Field label="% Interés">
                 <Input type="number" min={0} step="0.01" value={porcInteres} onChange={(e) => setPorcInteres(e.target.value)} inputMode="decimal" />

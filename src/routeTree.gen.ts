@@ -13,6 +13,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppPreciosRouteImport } from './routes/_app.precios'
 import { Route as AppPerfilRouteImport } from './routes/_app.perfil'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppSolicitudesIndexRouteImport } from './routes/_app.solicitudes.index'
@@ -38,6 +39,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppPreciosRoute = AppPreciosRouteImport.update({
+  id: '/precios',
+  path: '/precios',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppPerfilRoute = AppPerfilRouteImport.update({
   id: '/perfil',
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/dashboard': typeof AppDashboardRoute
   '/perfil': typeof AppPerfilRoute
+  '/precios': typeof AppPreciosRoute
   '/clientes/nuevo': typeof AppClientesNuevoRoute
   '/solicitudes/$id': typeof AppSolicitudesIdRoute
   '/solicitudes/nueva': typeof AppSolicitudesNuevaRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/dashboard': typeof AppDashboardRoute
   '/perfil': typeof AppPerfilRoute
+  '/precios': typeof AppPreciosRoute
   '/clientes/nuevo': typeof AppClientesNuevoRoute
   '/solicitudes/$id': typeof AppSolicitudesIdRoute
   '/solicitudes/nueva': typeof AppSolicitudesNuevaRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/perfil': typeof AppPerfilRoute
+  '/_app/precios': typeof AppPreciosRoute
   '/_app/clientes/nuevo': typeof AppClientesNuevoRoute
   '/_app/solicitudes/$id': typeof AppSolicitudesIdRoute
   '/_app/solicitudes/nueva': typeof AppSolicitudesNuevaRoute
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/dashboard'
     | '/perfil'
+    | '/precios'
     | '/clientes/nuevo'
     | '/solicitudes/$id'
     | '/solicitudes/nueva'
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/dashboard'
     | '/perfil'
+    | '/precios'
     | '/clientes/nuevo'
     | '/solicitudes/$id'
     | '/solicitudes/nueva'
@@ -136,6 +147,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/_app/dashboard'
     | '/_app/perfil'
+    | '/_app/precios'
     | '/_app/clientes/nuevo'
     | '/_app/solicitudes/$id'
     | '/_app/solicitudes/nueva'
@@ -178,6 +190,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/precios': {
+      id: '/_app/precios'
+      path: '/precios'
+      fullPath: '/precios'
+      preLoaderRoute: typeof AppPreciosRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/perfil': {
       id: '/_app/perfil'
@@ -227,6 +246,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppPerfilRoute: typeof AppPerfilRoute
+  AppPreciosRoute: typeof AppPreciosRoute
   AppClientesNuevoRoute: typeof AppClientesNuevoRoute
   AppSolicitudesIdRoute: typeof AppSolicitudesIdRoute
   AppSolicitudesNuevaRoute: typeof AppSolicitudesNuevaRoute
@@ -236,6 +256,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppPerfilRoute: AppPerfilRoute,
+  AppPreciosRoute: AppPreciosRoute,
   AppClientesNuevoRoute: AppClientesNuevoRoute,
   AppSolicitudesIdRoute: AppSolicitudesIdRoute,
   AppSolicitudesNuevaRoute: AppSolicitudesNuevaRoute,

@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, FileText, FilePlus, User, Moon, Sun, LogOut } from "lucide-react";
+import { Home, FileText, FilePlus, Tag, User, Moon, Sun, LogOut } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ const items = [
   { to: "/dashboard", label: "Inicio", icon: Home },
   { to: "/solicitudes", label: "Solicitudes", icon: FileText },
   { to: "/solicitudes/nueva", label: "Nueva solicitud", icon: FilePlus },
+  { to: "/precios", label: "Precios", icon: Tag },
   { to: "/perfil", label: "Perfil", icon: User },
 ] as const;
 

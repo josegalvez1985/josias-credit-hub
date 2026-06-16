@@ -275,11 +275,49 @@ const clienteCache = new Map<number, string>();
 export async function nombresClientes(codigos: number[]): Promise<Map<number, string>> {
   const faltantes = [...new Set(codigos)].filter((c) => !clienteCache.has(c));
   if (faltantes.length > 0) {
-    const todos = await listarClientes();
-    for (const c of todos) clienteCache.set(c.cod_cliente, c.razon_social);
+    // ORDS pagina (25 por defecto); recorremos todas las páginas para no perder ningún cliente.
+    let offset = 0;
+    for (;;) {
+      const feed = await request<OrdsFeed<Cliente> & { hasMore?: boolean }>(
+        `/clientes/?limit=500&offset=${offset}`,
+      );
+      const items = feed.items ?? [];
+      for (const c of items) clienteCache.set(c.cod_cliente, c.razon_social);
+      if (!feed.hasMore || items.length === 0) break;
+      offset += items.length;
+    }
   }
   const out = new Map<number, string>();
   for (const c of codigos) out.set(c, clienteCache.get(c) ?? `Cliente ${c}`);
+  return out;
+}
+
+// ----- Precios de venta (vista V_PRECIOS_VENTAS) -----
+export type PrecioVenta = {
+  cod_articulo: number;
+  nombre_articulo: string;
+  precio_unitario: number;
+  id_lista_precio: number;
+  lista_precio: string;
+  cantidad_cuotas: number;
+  porcentaje: number;
+  precio_con_recargo: number;
+  valor_cuota: number | null;
+};
+
+// Trae todas las filas de precios paginando (ORDS pagina de 25 por defecto).
+export async function listarPrecios(): Promise<PrecioVenta[]> {
+  const out: PrecioVenta[] = [];
+  let offset = 0;
+  for (;;) {
+    const feed = await request<OrdsFeed<PrecioVenta> & { hasMore?: boolean }>(
+      `/solicitudes/precios?limit=500&offset=${offset}`,
+    );
+    const items = feed.items ?? [];
+    out.push(...items);
+    if (!feed.hasMore || items.length === 0) break;
+    offset += items.length;
+  }
   return out;
 }
 

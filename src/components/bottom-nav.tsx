@@ -1,9 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, FilePlus, FileText, User } from "lucide-react";
+import { Home, FilePlus, FileText, Tag, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
-  to: "/dashboard" | "/solicitudes" | "/solicitudes/nueva" | "/perfil";
+  to: "/dashboard" | "/solicitudes" | "/solicitudes/nueva" | "/precios" | "/perfil";
   label: string;
   icon: typeof Home;
   highlight?: boolean;
@@ -13,6 +13,7 @@ const items: NavItem[] = [
   { to: "/dashboard", label: "Inicio", icon: Home },
   { to: "/solicitudes", label: "Solicitudes", icon: FileText },
   { to: "/solicitudes/nueva", label: "Nueva", icon: FilePlus, highlight: true },
+  { to: "/precios", label: "Precios", icon: Tag },
   { to: "/perfil", label: "Perfil", icon: User },
 ];
 
