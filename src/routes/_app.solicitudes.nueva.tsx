@@ -208,7 +208,7 @@ function NewApplication() {
     try {
       const { id } = await crearSolicitud({
         cabecera: {
-          nro_solicitud: Date.now() % 1000000000,
+          nro_solicitud: null,
           fecha_factura: fechaFactura,
           referencia: "",
           cod_cliente: cliente.value,
@@ -480,10 +480,10 @@ function NewApplication() {
                     <Input type="tel" value={act.telefono} onChange={(e) => setAct((a) => ({ ...a, telefono: e.target.value }))} />
                   </Field>
                   <Field label="Ingresos mensuales">
-                    <Input type="number" min={0} value={act.ingresos_mensuales} onChange={(e) => setAct((a) => ({ ...a, ingresos_mensuales: e.target.value }))} inputMode="numeric" />
+                    <Input inputMode="numeric" value={act.ingresos_mensuales ? Number(act.ingresos_mensuales).toLocaleString("es-PY") : ""} onChange={(e) => setAct((a) => ({ ...a, ingresos_mensuales: e.target.value.replace(/\D/g, "") }))} />
                   </Field>
                   <Field label="Otros ingresos">
-                    <Input type="number" min={0} value={act.otros_ingresos} onChange={(e) => setAct((a) => ({ ...a, otros_ingresos: e.target.value }))} inputMode="numeric" />
+                    <Input inputMode="numeric" value={act.otros_ingresos ? Number(act.otros_ingresos).toLocaleString("es-PY") : ""} onChange={(e) => setAct((a) => ({ ...a, otros_ingresos: e.target.value.replace(/\D/g, "") }))} />
                   </Field>
                   <Field label="Antigüedad">
                     <Input value={act.antiguedad} onChange={(e) => setAct((a) => ({ ...a, antiguedad: e.target.value }))} placeholder="Ej: 2 años" />

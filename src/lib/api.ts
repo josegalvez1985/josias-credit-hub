@@ -130,7 +130,7 @@ export async function lovLabels(
 
 // ----- Solicitud (cabecera + hijos) -----
 export type CabeceraInput = {
-  nro_solicitud: number;
+  nro_solicitud: null;
   fecha_factura: string; // YYYY-MM-DD
   referencia: string;
   cod_cliente: number;
