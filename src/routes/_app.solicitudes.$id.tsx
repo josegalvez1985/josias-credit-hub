@@ -31,6 +31,7 @@ type Labels = {
   ciudades: Map<number, string>;
   vendedores: Map<number, string>;
   profesiones: Map<number, string>;
+  relaciones: Map<number, string>;
 };
 
 export const Route = createFileRoute("/_app/solicitudes/$id")({
@@ -54,6 +55,7 @@ function SolicitudDetalle() {
     ciudades: new Map(),
     vendedores: new Map(),
     profesiones: new Map(),
+    relaciones: new Map(),
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,15 +74,16 @@ function SolicitudDetalle() {
         setDetalles(d);
         setReferencias(r);
         setActividad(a[0] ?? null);
-        const [cli, articulos, ciudades, vendedores, profesiones] = await Promise.all([
+        const [cli, articulos, ciudades, vendedores, profesiones, relaciones] = await Promise.all([
           obtenerCliente(c.cod_cliente).catch(() => null),
           lovLabels("articulos").catch(() => new Map<number, string>()),
           lovLabels("ciudades").catch(() => new Map<number, string>()),
           lovLabels("vendedores").catch(() => new Map<number, string>()),
           lovLabels("profesiones").catch(() => new Map<number, string>()),
+          lovLabels("relaciones").catch(() => new Map<number, string>()),
         ]);
         setCliente(cli);
-        setLabels({ articulos, ciudades, vendedores, profesiones });
+        setLabels({ articulos, ciudades, vendedores, profesiones, relaciones });
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar"))
       .finally(() => setLoading(false));
@@ -246,7 +249,7 @@ function SolicitudDetalle() {
               <div key={r.id_detalle} className="rounded-xl border border-border p-3">
                 <p className="font-medium">{r.nombre_apellido}</p>
                 <p className="text-xs text-muted-foreground">
-                  {r.relacion && `${r.relacion} · `}{r.telefono}
+                  {r.relacion ? `${labels.relaciones.get(r.relacion) ?? `Relación ${r.relacion}`} · ` : ""}{r.telefono}
                 </p>
               </div>
             ))}

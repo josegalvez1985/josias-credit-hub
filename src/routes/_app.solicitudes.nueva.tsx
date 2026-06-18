@@ -143,9 +143,10 @@ function NewApplication() {
   const [actProfesion, setActProfesion] = useState<{ value: number; label: string } | null>(null);
   const [actCiudad, setActCiudad] = useState<{ value: number; label: string } | null>(null);
 
-  // ---- Referencias
-  const [referencias, setReferencias] = useState<ReferenciaInput[]>([]);
-  const [refRow, setRefRow] = useState<ReferenciaInput>({ relacion: "", telefono: "", nombre_apellido: "" });
+  // ---- Referencias (guardamos el label de la relación solo para mostrar en la lista)
+  type RefRow = ReferenciaInput & { relacionLabel: string };
+  const [referencias, setReferencias] = useState<RefRow[]>([]);
+  const [refRow, setRefRow] = useState<RefRow>({ relacion: 0, relacionLabel: "", telefono: "", nombre_apellido: "" });
 
   // ---- Cálculos
   const cuotas = Number(cantidadCuotas) || 1;
@@ -192,7 +193,7 @@ function NewApplication() {
       return toast.error("Nombre y teléfono son obligatorios");
     }
     setReferencias((r) => [...r, refRow]);
-    setRefRow({ relacion: "", telefono: "", nombre_apellido: "" });
+    setRefRow({ relacion: 0, relacionLabel: "", telefono: "", nombre_apellido: "" });
   }
 
   function canAdvance(): boolean {
@@ -225,7 +226,7 @@ function NewApplication() {
           ...d,
           precio_unitario: conRecargo(precio_base),
         })),
-        referencias,
+        referencias: referencias.map(({ relacionLabel: _rl, ...r }) => r),
         actividad:
           actEnabled && actProfesion && actCiudad
             ? {
@@ -532,7 +533,14 @@ function NewApplication() {
                   <Input type="tel" value={refRow.telefono} onChange={(e) => setRefRow((r) => ({ ...r, telefono: e.target.value }))} />
                 </Field>
                 <Field label="Relación">
-                  <Input value={refRow.relacion} onChange={(e) => setRefRow((r) => ({ ...r, relacion: e.target.value }))} placeholder="Ej: Familiar, Amigo" />
+                  <AsyncCombobox
+                    title="Relación"
+                    value={refRow.relacion || null}
+                    label={refRow.relacionLabel || null}
+                    placeholder="Seleccionar relación..."
+                    fetcher={lov.relaciones}
+                    onSelect={(it) => setRefRow((r) => ({ ...r, relacion: it.value, relacionLabel: it.label }))}
+                  />
                 </Field>
               </div>
               <Button type="button" onClick={addReferencia} className="mt-3">
@@ -549,7 +557,7 @@ function NewApplication() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{r.nombre_apellido}</p>
                       <p className="text-xs text-muted-foreground">
-                        {r.relacion && `${r.relacion} · `}{r.telefono}
+                        {r.relacionLabel && `${r.relacionLabel} · `}{r.telefono}
                       </p>
                     </div>
                     <button

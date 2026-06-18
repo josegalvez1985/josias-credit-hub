@@ -8,6 +8,20 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// El AuthProvider registra aquí cómo cerrar sesión; así api.ts (que no es React)
+// puede expulsar al usuario cuando el token expira sin importar el componente.
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null) {
+  onUnauthorized = fn;
+}
+
+function handleUnauthorized() {
+  if (onUnauthorized) onUnauthorized();
+  else if (typeof window !== "undefined") {
+    window.location.href = `${import.meta.env.BASE_URL}login`;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!API_URL) throw new Error("VITE_API_URL no configurada");
   let res: Response;
@@ -32,6 +46,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       data = text;
     }
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    handleUnauthorized();
+    throw new Error("Sesión expirada. Vuelve a iniciar sesión.");
   }
 
   if (!res.ok || (data && typeof data === "object" && (data as { success?: boolean }).success === false)) {
@@ -113,13 +132,14 @@ export const lov = {
   vendedores: (q?: string) => feed<LovItem>("/solicitudes/lov/vendedores", q),
   articulos: (q?: string) => feed<LovItem & { cod_unidad_medida?: number }>("/solicitudes/lov/articulos", q),
   profesiones: (q?: string) => feed<LovItem>("/solicitudes/lov/profesiones", q),
+  relaciones: (q?: string) => feed<LovItem>("/solicitudes/lov/relaciones", q),
 };
 
 // Resuelve descripciones de un LOV por código, cacheando la lista completa.
 const lovCache: Record<string, Map<number, string>> = {};
 
 export async function lovLabels(
-  tipo: "articulos" | "ciudades" | "vendedores" | "profesiones",
+  tipo: "articulos" | "ciudades" | "vendedores" | "profesiones" | "relaciones",
 ): Promise<Map<number, string>> {
   if (!lovCache[tipo]) {
     const items = await lov[tipo]();
@@ -151,7 +171,7 @@ export type DetalleInput = {
 };
 
 export type ReferenciaInput = {
-  relacion: string;
+  relacion: number; // cod_relacion; el handler ORDS bindea :relacion
   telefono: string;
   nombre_apellido: string;
 };

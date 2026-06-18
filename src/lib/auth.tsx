@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { setUnauthorizedHandler } from "./api";
 
 export type User = {
   id: string;
@@ -73,6 +74,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (u) localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
     else localStorage.removeItem(STORAGE_KEY);
   };
+
+  // Cuando api.ts recibe un 401/403, limpia la sesión. El layout _app redirige
+  // a /login al detectar user === null.
+  useEffect(() => {
+    setUnauthorizedHandler(() => persist(null));
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   const login = async (username: string, password: string) => {
     // Sin API configurada: login mock para desarrollo
