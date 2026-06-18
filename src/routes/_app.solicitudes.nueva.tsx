@@ -78,7 +78,6 @@ function NewApplication() {
   const [detalles, setDetalles] = useState<DetalleRow[]>([]);
   const [artSel, setArtSel] = useState<{ value: number; label: string } | null>(null);
   const [artCantidad, setArtCantidad] = useState("1");
-  const [artPrecio, setArtPrecio] = useState("");
 
   // ---- Precios (V_PRECIOS_VENTAS): se cargan una vez y se indexan por artículo.
   const [precios, setPrecios] = useState<PrecioVenta[]>([]);
@@ -156,10 +155,21 @@ function NewApplication() {
 
   // precio_unitario por línea = precio base + recargo de la cuota elegida.
   const conRecargo = (base: number) => Math.round(base * (1 + interes / 100));
-  const total = useMemo(
+  // Total calculado a partir de los artículos (con recargo, antes de entrega).
+  const totalCalculado = useMemo(
     () => detalles.reduce((s, d) => s + d.cantidad * conRecargo(d.precio_base), 0),
     [detalles, interes],
   );
+
+  // Total negociado por el vendedor. null = usa el calculado. Se resetea cuando
+  // cambian los artículos o el recargo (la base ya no aplica).
+  const [totalOverride, setTotalOverride] = useState<number | null>(null);
+  useEffect(() => setTotalOverride(null), [detalles, interes]);
+
+  const total = totalOverride ?? totalCalculado;
+  // Factor para repartir el total negociado proporcionalmente entre las líneas.
+  const factor = totalCalculado > 0 ? total / totalCalculado : 1;
+
   const montoCuota = useMemo(() => {
     const base = Math.max(total - entrega, 0);
     return cuotas > 0 ? Math.round(base / cuotas) : 0;
@@ -172,20 +182,14 @@ function NewApplication() {
     }
   }, [opcionesCuotas]);
 
-  // Autocompleta el precio (base) al elegir un artículo.
-  useEffect(() => {
-    if (artSel) setArtPrecio(precioBaseArtSel ? Number(precioBaseArtSel).toLocaleString("es-PY") : "");
-  }, [artSel, precioBaseArtSel]);
-
   function addDetalle() {
     if (!artSel) return toast.error("Selecciona un artículo");
     const cantidad = Number(artCantidad) || 0;
-    const precio = Number(artPrecio.replace(/\D/g, "")) || 0;
+    const precio = Number(precioBaseArtSel) || 0;
     if (cantidad <= 0 || precio <= 0) return toast.error("Cantidad y precio deben ser mayores a 0");
     setDetalles((d) => [...d, { cod_articulo: artSel.value, cantidad, precio_unitario: precio, precio_base: precio, label: artSel.label }]);
     setArtSel(null);
     setArtCantidad("1");
-    setArtPrecio("");
   }
 
   function addReferencia() {
@@ -224,7 +228,7 @@ function NewApplication() {
         },
         detalles: detalles.map(({ label: _l, precio_base, ...d }) => ({
           ...d,
-          precio_unitario: conRecargo(precio_base),
+          precio_unitario: Math.round(conRecargo(precio_base) * factor),
         })),
         referencias: referencias.map(({ relacionLabel: _rl, ...r }) => r),
         actividad:
@@ -347,12 +351,9 @@ function NewApplication() {
                   onSelect={(it) => setArtSel({ value: it.value, label: it.label })}
                 />
               </Field>
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
                 <Field label="Cantidad">
                   <Input type="number" min={1} value={artCantidad} onChange={(e) => setArtCantidad(e.target.value)} inputMode="numeric" />
-                </Field>
-                <Field label="Precio unitario">
-                  <Input type="text" value={artPrecio} onChange={(e) => setArtPrecio(fmtMiles(e.target.value))} inputMode="numeric" />
                 </Field>
                 <Button type="button" onClick={addDetalle} className="col-span-2 sm:col-span-1">
                   <Plus className="h-4 w-4" /> Agregar
@@ -369,16 +370,11 @@ function NewApplication() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{d.label}</p>
                       <p className="text-xs leading-snug text-muted-foreground">
-                        {d.cantidad} × {formatCurrency(conRecargo(d.precio_base))}
-                        {interes > 0 && (
-                          <span className="ml-1 block sm:inline">
-                            (base {formatCurrency(d.precio_base)} +{interes}%)
-                          </span>
-                        )}
+                        {d.cantidad} × {formatCurrency(Math.round(conRecargo(d.precio_base) * factor))}
                       </p>
                     </div>
                     <p className="shrink-0 whitespace-nowrap text-right font-display font-semibold">
-                      {formatCurrency(d.cantidad * conRecargo(d.precio_base))}
+                      {formatCurrency(d.cantidad * Math.round(conRecargo(d.precio_base) * factor))}
                     </p>
                     <button
                       type="button"
@@ -390,9 +386,29 @@ function NewApplication() {
                     </button>
                   </div>
                 ))}
-                <div className="flex items-center justify-between rounded-xl bg-muted px-4 py-3">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-muted px-4 py-3">
                   <span className="text-sm font-medium">Total</span>
-                  <span className="font-display text-lg font-semibold">{formatCurrency(total)}</span>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={total ? Number(total).toLocaleString("es-PY") : ""}
+                      onChange={(e) => {
+                        const n = Number(e.target.value.replace(/\D/g, ""));
+                        setTotalOverride(n > 0 ? n : null);
+                      }}
+                      className="h-9 w-36 bg-card text-right font-display text-lg font-semibold"
+                    />
+                    {totalOverride !== null && (
+                      <button
+                        type="button"
+                        onClick={() => setTotalOverride(null)}
+                        className="text-xs font-medium text-secondary hover:underline"
+                      >
+                        Restablecer
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -410,7 +426,7 @@ function NewApplication() {
                   ) : (
                     opcionesCuotas.map((o) => (
                       <option key={o.cuotas} value={o.cuotas}>
-                        {o.cuotas} cuotas {o.porcentaje > 0 ? `(+${o.porcentaje}%)` : ""}
+                        {o.cuotas} cuotas
                       </option>
                     ))
                   )}
