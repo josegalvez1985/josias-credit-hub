@@ -175,6 +175,9 @@ function NewApplication() {
     return cuotas > 0 ? Math.round(base / cuotas) : 0;
   }, [total, entrega, cuotas]);
 
+  // Función para redondear hacia arriba a múltiplo de 10.000
+  const redondearMonto = (monto: number) => Math.ceil(monto / 10000) * 10000;
+
   // Cuando hay plan de cuotas, fija la cantidad de cuotas a una opción válida.
   useEffect(() => {
     if (opcionesCuotas.length && !opcionesCuotas.some((o) => o.cuotas === cuotas)) {
@@ -365,16 +368,19 @@ function NewApplication() {
               <p className="py-4 text-center text-sm text-muted-foreground">Aún no has agregado artículos.</p>
             ) : (
               <div className="space-y-2">
-                {detalles.map((d, i) => (
+                {detalles.map((d, i) => {
+                  const precioUnitario = redondearMonto(conRecargo(d.precio_base) * factor);
+                  const totalLinea = redondearMonto(d.cantidad * precioUnitario);
+                  return (
                   <div key={i} className="flex items-start gap-3 rounded-xl border border-border p-3">
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{d.label}</p>
                       <p className="text-xs leading-snug text-muted-foreground">
-                        {d.cantidad} × {formatCurrency(Math.round(conRecargo(d.precio_base) * factor))}
+                        {d.cantidad} × {formatCurrency(precioUnitario)}
                       </p>
                     </div>
                     <p className="shrink-0 whitespace-nowrap text-right font-display font-semibold">
-                      {formatCurrency(d.cantidad * Math.round(conRecargo(d.precio_base) * factor))}
+                      {formatCurrency(totalLinea)}
                     </p>
                     <button
                       type="button"
@@ -385,14 +391,15 @@ function NewApplication() {
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                ))}
+                  );
+                })}
                 <div className="flex items-center justify-between gap-3 rounded-xl bg-muted px-4 py-3">
                   <span className="text-sm font-medium">Total</span>
                   <div className="flex items-center gap-2">
                     <Input
                       type="text"
                       inputMode="numeric"
-                      value={total ? Number(total).toLocaleString("es-PY") : ""}
+                      value={total ? redondearMonto(total).toLocaleString("es-PY") : ""}
                       onChange={(e) => {
                         const n = Number(e.target.value.replace(/\D/g, ""));
                         setTotalOverride(n > 0 ? n : null);
@@ -444,7 +451,7 @@ function NewApplication() {
               <Card className="bg-gradient-caramel p-5 text-primary-foreground shadow-elegant">
                 <p className="text-xs uppercase tracking-wider opacity-80">Cuota estimada</p>
                 <p className="mt-1 font-display text-3xl font-semibold">
-                  {formatCurrency(montoCuota)} <span className="text-base font-normal opacity-80">/ mes</span>
+                  {formatCurrency(redondearMonto(montoCuota))} <span className="text-base font-normal opacity-80">/ mes</span>
                 </p>
                 <p className="mt-1 text-xs opacity-80">{cuotas} cuotas · sujeto a aprobación.</p>
               </Card>
@@ -597,8 +604,8 @@ function NewApplication() {
             <SummaryRow label="Cliente" value={cliente?.label} />
             <SummaryRow label="Ciudad / Vendedor" value={`${ciudad?.label ?? "—"} · ${vendedor?.label ?? "—"}`} />
             <SummaryRow label="Artículos" value={`${detalles.length} ítem(s)`} />
-            <SummaryRow label="Total" value={formatCurrency(total)} />
-            <SummaryRow label="Plan" value={`${cuotas} cuotas de ${formatCurrency(montoCuota)}`} />
+            <SummaryRow label="Total" value={formatCurrency(redondearMonto(total))} />
+            <SummaryRow label="Plan" value={`${cuotas} cuotas de ${formatCurrency(redondearMonto(montoCuota))}`} />
             <SummaryRow label="Actividad laboral" value={actEnabled ? "Incluida" : "No incluida"} />
             <SummaryRow label="Referencias" value={`${referencias.length}`} />
           </div>
