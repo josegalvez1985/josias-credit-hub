@@ -1,5 +1,5 @@
 // Cliente HTTP para el backend ORDS (modulo "solicitudes").
-import { getStoredToken } from "./auth";
+import { getStoredToken, getStoredUsername } from "./auth";
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined;
 
@@ -162,6 +162,7 @@ export type CabeceraInput = {
   fec_vencimiento_inicial: string; // YYYY-MM-DD
   entrega_inicial: number;
   porc_interes: number;
+  cod_usuario?: string; // username logueado; el handler ORDS lo inserta y lo retorna
 };
 
 export type DetalleInput = {
@@ -278,10 +279,15 @@ export function obtenerCliente(cod: number) {
   return request<Cliente>(`/clientes/${cod}`);
 }
 
-export type Cabecera = CabeceraInput & { id: number; estado?: string };
+export type Cabecera = CabeceraInput & { id: number; estado?: string; cod_usuario?: string };
 
-export function listarCabeceras() {
-  return request<OrdsFeed<Cabecera>>("/solicitudes/cabecera").then((r) => r.items ?? []);
+// Solo devuelve las cabeceras del usuario logueado. Filtro client-side por
+// cod_usuario: el feed ORDS retorna esa columna y el login solo expone el username.
+export async function listarCabeceras() {
+  const { items = [] } = await request<OrdsFeed<Cabecera>>("/solicitudes/cabecera");
+  const me = getStoredUsername();
+  if (!me) return items;
+  return items.filter((c) => (c.cod_usuario ?? "").toUpperCase() === me.toUpperCase());
 }
 
 export function obtenerCabecera(id: number) {
@@ -359,7 +365,7 @@ export async function listarPrecios(): Promise<PrecioVenta[]> {
 export async function crearSolicitud(s: SolicitudCompleta): Promise<{ id: number }> {
   const cab = await request<{ id: number }>("/solicitudes/cabecera", {
     method: "POST",
-    body: JSON.stringify(s.cabecera),
+    body: JSON.stringify({ ...s.cabecera, cod_usuario: getStoredUsername() }),
   });
   const id = cab.id;
 

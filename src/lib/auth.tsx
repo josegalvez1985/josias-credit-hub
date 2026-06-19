@@ -57,6 +57,18 @@ export function getStoredToken(): string | null {
   }
 }
 
+// username del usuario logueado; se envía como cod_usuario al insertar solicitudes
+// y filtra las cabeceras para que cada quien solo vea las propias.
+export function getStoredUsername(): string | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return (JSON.parse(raw) as User).username ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
