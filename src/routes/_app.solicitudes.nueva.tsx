@@ -170,10 +170,31 @@ function NewApplication() {
   // Factor para repartir el total negociado proporcionalmente entre las líneas.
   const factor = totalCalculado > 0 ? total / totalCalculado : 1;
 
-  const montoCuota = useMemo(() => {
+  // Monto de cuota: editable o calculado
+  const [montoCuotaOverride, setMontoCuotaOverride] = useState<number | null>(null);
+  useEffect(() => setMontoCuotaOverride(null), [detalles, interes]);
+
+  const montoCuotaCalculado = useMemo(() => {
     const base = Math.max(total - entrega, 0);
     return cuotas > 0 ? Math.round(base / cuotas) : 0;
   }, [total, entrega, cuotas]);
+
+  const montoCuota = montoCuotaOverride ?? montoCuotaCalculado;
+
+  // Cuando se edita el monto de cuota, recalcular el total
+  const handleMontoCuotaChange = (newMonto: number) => {
+    setMontoCuotaOverride(newMonto);
+    const nuevoTotal = newMonto * cuotas + entrega;
+    setTotalOverride(nuevoTotal);
+  };
+
+  // Cuando se edita el total, recalcular la cuota
+  const handleTotalChange = (newTotal: number) => {
+    setTotalOverride(newTotal);
+    const base = Math.max(newTotal - entrega, 0);
+    const nuevaCuota = cuotas > 0 ? Math.round(base / cuotas) : 0;
+    setMontoCuotaOverride(nuevaCuota);
+  };
 
   // Función para redondear hacia arriba a múltiplo de 10.000
   const redondearMonto = (monto: number) => Math.ceil(monto / 10000) * 10000;
@@ -212,6 +233,20 @@ function NewApplication() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!cliente || !ciudad || !vendedor) return;
+
+    // Validar cálculos
+    const totalVerificacion = montoCuota * cuotas + entrega;
+    if (Math.abs(totalVerificacion - total) > 100) {
+      // Tolerancia de 100 por redondeos
+      toast.error(`Error de cálculo: cuota × ${cuotas} + entrega ≠ total. Revisa monto de cuota o total.`);
+      return;
+    }
+
+    if (total <= entrega) {
+      toast.error("El total debe ser mayor a la entrega inicial");
+      return;
+    }
+
     setLoading(true);
     try {
       const { id } = await crearSolicitud({
@@ -399,17 +434,25 @@ function NewApplication() {
                     <Input
                       type="text"
                       inputMode="numeric"
-                      value={total ? redondearMonto(total).toLocaleString("es-PY") : ""}
+                      value={totalOverride !== null ? totalOverride.toLocaleString("es-PY") : redondearMonto(totalCalculado).toLocaleString("es-PY")}
                       onChange={(e) => {
-                        const n = Number(e.target.value.replace(/\D/g, ""));
-                        setTotalOverride(n > 0 ? n : null);
+                        const input = e.target.value.replace(/\D/g, "");
+                        if (input) {
+                          handleTotalChange(Number(input));
+                        } else {
+                          setTotalOverride(null);
+                          setMontoCuotaOverride(null);
+                        }
                       }}
                       className="h-9 w-36 bg-card text-right font-display text-lg font-semibold"
                     />
                     {totalOverride !== null && (
                       <button
                         type="button"
-                        onClick={() => setTotalOverride(null)}
+                        onClick={() => {
+                          setTotalOverride(null);
+                          setMontoCuotaOverride(null);
+                        }}
                         className="text-xs font-medium text-secondary hover:underline"
                       >
                         Restablecer
@@ -420,7 +463,7 @@ function NewApplication() {
               </div>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Cuotas">
                 <select
                   value={cantidadCuotas}
@@ -442,18 +485,42 @@ function NewApplication() {
               <Field label="Entrega inicial">
                 <Input type="text" value={entregaInicial} onChange={(e) => setEntregaInicial(fmtMiles(e.target.value))} inputMode="numeric" />
               </Field>
-              <Field label="% Recargo">
-                <Input value={`${interes}%`} readOnly disabled className="bg-muted" />
-              </Field>
             </div>
 
             {total > 0 && (
-              <Card className="bg-gradient-caramel p-5 text-primary-foreground shadow-elegant">
-                <p className="text-xs uppercase tracking-wider opacity-80">Cuota estimada</p>
-                <p className="mt-1 font-display text-3xl font-semibold">
-                  {formatCurrency(redondearMonto(montoCuota))} <span className="text-base font-normal opacity-80">/ mes</span>
-                </p>
-                <p className="mt-1 text-xs opacity-80">{cuotas} cuotas · sujeto a aprobación.</p>
+              <Card className="bg-gradient-caramel p-5 text-primary-foreground shadow-elegant space-y-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wider opacity-80">Cuota estimada</p>
+                  <div className="mt-2 flex items-end gap-2">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={montoCuotaOverride !== null ? montoCuotaOverride.toLocaleString("es-PY") : redondearMonto(montoCuota).toLocaleString("es-PY")}
+                      onChange={(e) => {
+                        const input = e.target.value.replace(/\D/g, "");
+                        if (input) {
+                          handleMontoCuotaChange(Number(input));
+                        }
+                      }}
+                      className="h-11 bg-primary/20 text-right font-display text-2xl font-semibold text-primary-foreground placeholder-primary-foreground/50"
+                      placeholder="0"
+                    />
+                    <span className="pb-2 text-base font-normal opacity-80">/ mes</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs opacity-80">
+                  <span>{cuotas} cuotas</span>
+                  {montoCuotaOverride !== null && (
+                    <button
+                      type="button"
+                      onClick={() => setMontoCuotaOverride(null)}
+                      className="font-medium hover:opacity-100"
+                    >
+                      Restablecer
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs opacity-80">Total con entrega: {formatCurrency(redondearMonto(total))} (entrega: {formatCurrency(redondearMonto(entrega))})</p>
               </Card>
             )}
           </div>
