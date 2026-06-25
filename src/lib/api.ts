@@ -195,7 +195,7 @@ export type SolicitudCompleta = {
   cabecera: CabeceraInput;
   detalles: DetalleInput[];
   referencias: ReferenciaInput[];
-  actividad?: ActividadInput;
+  actividades: ActividadInput[];
 };
 
 // ----- Clientes -----
@@ -381,8 +381,8 @@ export async function crearSolicitud(s: SolicitudCompleta): Promise<{ id: number
     });
   }
 
-  if (s.actividad) {
-    await request(`/solicitudes/actividad/${id}`, { method: "POST", body: JSON.stringify(s.actividad) }).catch((e) => {
+  for (const a of s.actividades) {
+    await request(`/solicitudes/actividad/${id}`, { method: "POST", body: JSON.stringify(a) }).catch((e) => {
       throw new Error(`Solicitud ${id} creada pero falló la actividad laboral: ${e.message}`);
     });
   }

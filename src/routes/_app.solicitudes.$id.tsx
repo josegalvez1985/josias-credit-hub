@@ -49,7 +49,7 @@ function SolicitudDetalle() {
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [detalles, setDetalles] = useState<DetalleRow[]>([]);
   const [referencias, setReferencias] = useState<ReferenciaRow[]>([]);
-  const [actividad, setActividad] = useState<ActividadRow | null>(null);
+  const [actividades, setActividades] = useState<ActividadRow[]>([]);
   const [labels, setLabels] = useState<Labels>({
     articulos: new Map(),
     ciudades: new Map(),
@@ -73,7 +73,7 @@ function SolicitudDetalle() {
         setCab(c);
         setDetalles(d);
         setReferencias(r);
-        setActividad(a[0] ?? null);
+        setActividades(a);
         const [cli, articulos, ciudades, vendedores, profesiones, relaciones] = await Promise.all([
           obtenerCliente(c.cod_cliente).catch(() => null),
           lovLabels("articulos").catch(() => new Map<number, string>()),
@@ -214,23 +214,31 @@ function SolicitudDetalle() {
       </Card>
 
       {/* Actividad laboral */}
-      {actividad && (
+      {actividades.length > 0 && (
         <Card className="p-6">
           <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-semibold">
             <Briefcase className="h-5 w-5 text-secondary" /> Actividad laboral
+            <span className="text-sm font-normal text-muted-foreground">({actividades.length})</span>
           </h2>
-          <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-            <Row label="Situación" value={actividad.es_empleado === "S" ? "Empleado" : "Independiente"} />
-            <Row label="Empresa / Negocio" value={actividad.nombre_empresa} />
-            <Row label="Puesto / Ocupación" value={actividad.puesto_ocupado} />
-            <Row label="Profesión" value={labels.profesiones.get(actividad.cod_profesion)} />
-            <Row label="Antigüedad" value={actividad.antiguedad} />
-            <Row label="Ingresos mensuales" value={formatCurrency(actividad.ingresos_mensuales)} />
-            <Row label="Otros ingresos" value={formatCurrency(actividad.otros_ingresos)} />
-            <Row label="Dirección" value={actividad.direccion} />
-            <Row label="Ciudad laboral" value={labels.ciudades.get(actividad.cod_ciudad)} />
-            <Row label="Teléfono" value={actividad.telefono} />
-            <Row label="Aporta IPS" value={actividad.aporta_ips === "S" ? "Sí" : "No"} />
+          <div className="space-y-4">
+            {actividades.map((a, i) => (
+              <div
+                key={a.id_detalle}
+                className={`grid gap-x-6 gap-y-3 sm:grid-cols-2${i > 0 ? " border-t border-border pt-4" : ""}`}
+              >
+                <Row label="Situación" value={a.es_empleado === "S" ? "Empleado" : "Independiente"} />
+                <Row label="Empresa / Negocio" value={a.nombre_empresa} />
+                <Row label="Puesto / Ocupación" value={a.puesto_ocupado} />
+                <Row label="Profesión" value={labels.profesiones.get(a.cod_profesion)} />
+                <Row label="Antigüedad" value={a.antiguedad} />
+                <Row label="Ingresos mensuales" value={formatCurrency(a.ingresos_mensuales)} />
+                <Row label="Otros ingresos" value={formatCurrency(a.otros_ingresos)} />
+                <Row label="Dirección" value={a.direccion} />
+                <Row label="Ciudad laboral" value={labels.ciudades.get(a.cod_ciudad)} />
+                <Row label="Teléfono" value={a.telefono} />
+                <Row label="Aporta IPS" value={a.aporta_ips === "S" ? "Sí" : "No"} />
+              </div>
+            ))}
           </div>
         </Card>
       )}

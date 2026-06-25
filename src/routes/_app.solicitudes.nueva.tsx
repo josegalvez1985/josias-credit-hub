@@ -21,6 +21,7 @@ import {
   lov,
   type DetalleInput,
   type ReferenciaInput,
+  type ActividadInput,
   type LovItem,
   type PrecioVenta,
 } from "@/lib/api";
@@ -126,9 +127,9 @@ function NewApplication() {
     [planArt],
   );
 
-  // ---- Actividad laboral
-  const [actEnabled, setActEnabled] = useState(false);
-  const [act, setAct] = useState({
+  // ---- Actividad laboral (tabla detalle: se pueden cargar varias)
+  type ActRow = ActividadInput & { profesionLabel: string; ciudadLabel: string };
+  const ACT_VACIA = {
     es_empleado: "S",
     nombre_empresa: "",
     direccion: "",
@@ -138,7 +139,9 @@ function NewApplication() {
     antiguedad: "",
     telefono: "",
     aporta_ips: "N",
-  });
+  };
+  const [actividades, setActividades] = useState<ActRow[]>([]);
+  const [act, setAct] = useState(ACT_VACIA);
   const [actProfesion, setActProfesion] = useState<{ value: number; label: string } | null>(null);
   const [actCiudad, setActCiudad] = useState<{ value: number; label: string } | null>(null);
 
@@ -224,6 +227,27 @@ function NewApplication() {
     setRefRow({ relacion: 0, relacionLabel: "", telefono: "", nombre_apellido: "" });
   }
 
+  function addActividad() {
+    if (!actProfesion || !actCiudad) {
+      return toast.error("Profesión y ciudad laboral son obligatorias");
+    }
+    setActividades((a) => [
+      ...a,
+      {
+        ...act,
+        ingresos_mensuales: Number(act.ingresos_mensuales) || 0,
+        otros_ingresos: Number(act.otros_ingresos) || 0,
+        cod_profesion: actProfesion.value,
+        cod_ciudad: actCiudad.value,
+        profesionLabel: actProfesion.label,
+        ciudadLabel: actCiudad.label,
+      },
+    ]);
+    setAct(ACT_VACIA);
+    setActProfesion(null);
+    setActCiudad(null);
+  }
+
   function canAdvance(): boolean {
     if (step === 0) return !!cliente && !!ciudad && !!vendedor;
     if (step === 1) return detalles.length > 0;
@@ -269,16 +293,7 @@ function NewApplication() {
           precio_unitario: Math.round(conRecargo(precio_base) * factor),
         })),
         referencias: referencias.map(({ relacionLabel: _rl, ...r }) => r),
-        actividad:
-          actEnabled && actProfesion && actCiudad
-            ? {
-                ...act,
-                ingresos_mensuales: Number(act.ingresos_mensuales) || 0,
-                otros_ingresos: Number(act.otros_ingresos) || 0,
-                cod_profesion: actProfesion.value,
-                cod_ciudad: actCiudad.value,
-              }
-            : undefined,
+        actividades: actividades.map(({ profesionLabel: _pl, ciudadLabel: _cl, ...a }) => a),
       });
       toast.success(`Solicitud #${id} registrada`);
       navigate({ to: "/solicitudes" });
@@ -529,83 +544,105 @@ function NewApplication() {
         {/* ---------- PASO 2: ACTIVIDAD LABORAL ---------- */}
         {step === 2 && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between rounded-xl border border-border p-4">
-              <div>
-                <p className="font-medium">Incluir actividad laboral</p>
-                <p className="text-xs text-muted-foreground">Opcional, pero recomendado para evaluación.</p>
+            <div className="rounded-xl border border-dashed border-border p-4 space-y-4">
+              <div className="flex gap-2">
+                {(["S", "N"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setAct((a) => ({ ...a, es_empleado: v }))}
+                    className={cn(
+                      "flex-1 rounded-xl border px-4 py-2.5 text-sm transition-colors",
+                      act.es_empleado === v
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border text-muted-foreground",
+                    )}
+                  >
+                    {v === "S" ? "Empleado" : "Independiente"}
+                  </button>
+                ))}
               </div>
-              <Switch checked={actEnabled} onCheckedChange={setActEnabled} />
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Empresa / Negocio">
+                  <Input value={act.nombre_empresa} onChange={(e) => setAct((a) => ({ ...a, nombre_empresa: e.target.value }))} />
+                </Field>
+                <Field label="Puesto / Ocupación">
+                  <Input value={act.puesto_ocupado} onChange={(e) => setAct((a) => ({ ...a, puesto_ocupado: e.target.value }))} />
+                </Field>
+                <Field label="Dirección">
+                  <Input value={act.direccion} onChange={(e) => setAct((a) => ({ ...a, direccion: e.target.value }))} />
+                </Field>
+                <Field label="Teléfono">
+                  <Input type="tel" value={act.telefono} onChange={(e) => setAct((a) => ({ ...a, telefono: e.target.value }))} />
+                </Field>
+                <Field label="Ingresos mensuales">
+                  <Input inputMode="numeric" value={act.ingresos_mensuales ? Number(act.ingresos_mensuales).toLocaleString("es-PY") : ""} onChange={(e) => setAct((a) => ({ ...a, ingresos_mensuales: e.target.value.replace(/\D/g, "") }))} />
+                </Field>
+                <Field label="Otros ingresos">
+                  <Input inputMode="numeric" value={act.otros_ingresos ? Number(act.otros_ingresos).toLocaleString("es-PY") : ""} onChange={(e) => setAct((a) => ({ ...a, otros_ingresos: e.target.value.replace(/\D/g, "") }))} />
+                </Field>
+                <Field label="Antigüedad">
+                  <Input value={act.antiguedad} onChange={(e) => setAct((a) => ({ ...a, antiguedad: e.target.value }))} placeholder="Ej: 2 años" />
+                </Field>
+                <Field label="Profesión">
+                  <AsyncCombobox
+                    title="Profesión"
+                    value={actProfesion?.value ?? null}
+                    label={actProfesion?.label ?? null}
+                    fetcher={lov.profesiones}
+                    onSelect={(it) => setActProfesion({ value: it.value, label: it.label })}
+                  />
+                </Field>
+                <Field label="Ciudad laboral">
+                  <AsyncCombobox
+                    title="Ciudad laboral"
+                    value={actCiudad?.value ?? null}
+                    label={actCiudad?.label ?? null}
+                    fetcher={lov.ciudades}
+                    onSelect={(it) => setActCiudad({ value: it.value, label: it.label })}
+                  />
+                </Field>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-border p-4">
+                <p className="font-medium">¿Aporta a IPS?</p>
+                <Switch
+                  checked={act.aporta_ips === "S"}
+                  onCheckedChange={(v) => setAct((a) => ({ ...a, aporta_ips: v ? "S" : "N" }))}
+                />
+              </div>
+
+              <Button type="button" onClick={addActividad} className="mt-1">
+                <Plus className="h-4 w-4" /> Agregar actividad
+              </Button>
             </div>
 
-            {actEnabled && (
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  {(["S", "N"] as const).map((v) => (
+            {actividades.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">Sin actividades agregadas.</p>
+            ) : (
+              <div className="space-y-2">
+                {actividades.map((a, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{a.nombre_empresa || a.profesionLabel}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {a.es_empleado === "S" ? "Empleado" : "Independiente"}
+                        {a.puesto_ocupado && ` · ${a.puesto_ocupado}`}
+                        {a.profesionLabel && ` · ${a.profesionLabel}`}
+                        {a.ingresos_mensuales ? ` · ${formatCurrency(a.ingresos_mensuales)}` : ""}
+                      </p>
+                    </div>
                     <button
-                      key={v}
                       type="button"
-                      onClick={() => setAct((a) => ({ ...a, es_empleado: v }))}
-                      className={cn(
-                        "flex-1 rounded-xl border px-4 py-2.5 text-sm transition-colors",
-                        act.es_empleado === v
-                          ? "border-primary bg-primary/10 text-foreground"
-                          : "border-border text-muted-foreground",
-                      )}
+                      onClick={() => setActividades((arr) => arr.filter((_, idx) => idx !== i))}
+                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      aria-label="Quitar"
                     >
-                      {v === "S" ? "Empleado" : "Independiente"}
+                      <Trash2 className="h-4 w-4" />
                     </button>
-                  ))}
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Empresa / Negocio">
-                    <Input value={act.nombre_empresa} onChange={(e) => setAct((a) => ({ ...a, nombre_empresa: e.target.value }))} />
-                  </Field>
-                  <Field label="Puesto / Ocupación">
-                    <Input value={act.puesto_ocupado} onChange={(e) => setAct((a) => ({ ...a, puesto_ocupado: e.target.value }))} />
-                  </Field>
-                  <Field label="Dirección">
-                    <Input value={act.direccion} onChange={(e) => setAct((a) => ({ ...a, direccion: e.target.value }))} />
-                  </Field>
-                  <Field label="Teléfono">
-                    <Input type="tel" value={act.telefono} onChange={(e) => setAct((a) => ({ ...a, telefono: e.target.value }))} />
-                  </Field>
-                  <Field label="Ingresos mensuales">
-                    <Input inputMode="numeric" value={act.ingresos_mensuales ? Number(act.ingresos_mensuales).toLocaleString("es-PY") : ""} onChange={(e) => setAct((a) => ({ ...a, ingresos_mensuales: e.target.value.replace(/\D/g, "") }))} />
-                  </Field>
-                  <Field label="Otros ingresos">
-                    <Input inputMode="numeric" value={act.otros_ingresos ? Number(act.otros_ingresos).toLocaleString("es-PY") : ""} onChange={(e) => setAct((a) => ({ ...a, otros_ingresos: e.target.value.replace(/\D/g, "") }))} />
-                  </Field>
-                  <Field label="Antigüedad">
-                    <Input value={act.antiguedad} onChange={(e) => setAct((a) => ({ ...a, antiguedad: e.target.value }))} placeholder="Ej: 2 años" />
-                  </Field>
-                  <Field label="Profesión">
-                    <AsyncCombobox
-                      title="Profesión"
-                      value={actProfesion?.value ?? null}
-                      label={actProfesion?.label ?? null}
-                      fetcher={lov.profesiones}
-                      onSelect={(it) => setActProfesion({ value: it.value, label: it.label })}
-                    />
-                  </Field>
-                  <Field label="Ciudad laboral">
-                    <AsyncCombobox
-                      title="Ciudad laboral"
-                      value={actCiudad?.value ?? null}
-                      label={actCiudad?.label ?? null}
-                      fetcher={lov.ciudades}
-                      onSelect={(it) => setActCiudad({ value: it.value, label: it.label })}
-                    />
-                  </Field>
-                </div>
-
-                <div className="flex items-center justify-between rounded-xl border border-border p-4">
-                  <p className="font-medium">¿Aporta a IPS?</p>
-                  <Switch
-                    checked={act.aporta_ips === "S"}
-                    onCheckedChange={(v) => setAct((a) => ({ ...a, aporta_ips: v ? "S" : "N" }))}
-                  />
-                </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -673,7 +710,7 @@ function NewApplication() {
             <SummaryRow label="Artículos" value={`${detalles.length} ítem(s)`} />
             <SummaryRow label="Total" value={formatCurrency(redondearMonto(total))} />
             <SummaryRow label="Plan" value={`${cuotas} cuotas de ${formatCurrency(redondearMonto(montoCuota))}`} />
-            <SummaryRow label="Actividad laboral" value={actEnabled ? "Incluida" : "No incluida"} />
+            <SummaryRow label="Actividad laboral" value={`${actividades.length}`} />
             <SummaryRow label="Referencias" value={`${referencias.length}`} />
           </div>
         )}
