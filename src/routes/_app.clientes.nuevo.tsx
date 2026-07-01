@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AsyncCombobox } from "@/components/async-combobox";
+import { BirthdatePicker } from "@/components/birthdate-picker";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -127,7 +128,7 @@ function NewClient() {
               <Input type="tel" value={form.nro_telefono} onChange={(e) => update("nro_telefono", e.target.value)} required />
             </Field>
             <Field label="Fecha de nacimiento" required>
-              <Input type="date" value={form.fecha_nacimiento} onChange={(e) => update("fecha_nacimiento", e.target.value)} required />
+              <BirthdatePicker value={form.fecha_nacimiento} onChange={(v) => update("fecha_nacimiento", v)} />
             </Field>
             <Field label="Sexo" required>
               <div className="flex gap-2">
