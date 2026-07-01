@@ -70,22 +70,34 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export type LovItem = { value: number; label: string; [k: string]: unknown };
 type OrdsFeed<T> = { items: T[] };
 
-// Trae TODAS las páginas de un feed ORDS (pagina de 25 por defecto).
-async function feed<T>(path: string, q?: string): Promise<T[]> {
+// Trae TODAS las páginas de un feed ORDS (pagina de 25 por defecto) y filtra el
+// término localmente, sin distinguir mayúsculas/minúsculas ni depender del backend.
+async function feed<T extends LovItem>(path: string, q?: string): Promise<T[]> {
   const out: T[] = [];
   let offset = 0;
   for (;;) {
     const sep = path.includes("?") ? "&" : "?";
-    const qParam = q ? `&q=${encodeURIComponent(q)}` : "";
     const f = await request<OrdsFeed<T> & { hasMore?: boolean }>(
-      `${path}${sep}limit=500&offset=${offset}${qParam}`,
+      `${path}${sep}limit=500&offset=${offset}`,
     );
     const items = f.items ?? [];
     out.push(...items);
     if (!f.hasMore || items.length === 0) break;
     offset += items.length;
   }
-  return out;
+  const term = (q ?? "").trim();
+  if (!term) return out;
+  const lower = term.toLowerCase();
+  const digits = term.replace(/\D/g, "");
+  return out.filter((i) => {
+    const texto = Object.values(i)
+      .map((v) => String(v ?? ""))
+      .join(" ")
+      .toLowerCase();
+    if (texto.includes(lower)) return true;
+    if (!digits) return false;
+    return texto.replace(/\D/g, "").includes(digits);
+  });
 }
 
 type ClienteLov = LovItem & { nombre_fantasia?: string; ci?: string; ruc?: string };
@@ -135,17 +147,12 @@ export const lov = {
   relaciones: (q?: string) => feed<LovItem>("/solicitudes/lov/relaciones", q),
 };
 
-// Resuelve descripciones de un LOV por código, cacheando la lista completa.
-const lovCache: Record<string, Map<number, string>> = {};
-
+// Resuelve descripciones de un LOV por código. Siempre consulta la API (sin cache).
 export async function lovLabels(
   tipo: "articulos" | "ciudades" | "vendedores" | "profesiones" | "relaciones",
 ): Promise<Map<number, string>> {
-  if (!lovCache[tipo]) {
-    const items = await lov[tipo]();
-    lovCache[tipo] = new Map(items.map((i) => [i.value, i.label]));
-  }
-  return lovCache[tipo];
+  const items = await lov[tipo]();
+  return new Map(items.map((i) => [i.value, i.label]));
 }
 
 // ----- Solicitud (cabecera + hijos) -----
@@ -308,26 +315,22 @@ export function listarActividad(id: number) {
   return request<OrdsFeed<ActividadRow>>(`/solicitudes/actividad/${id}`).then((r) => r.items ?? []);
 }
 
-// Cache simple de nombres de cliente por código (evita refetch en la lista).
-const clienteCache = new Map<number, string>();
-
+// Resuelve nombres de cliente por código. Siempre consulta la API (sin cache).
 export async function nombresClientes(codigos: number[]): Promise<Map<number, string>> {
-  const faltantes = [...new Set(codigos)].filter((c) => !clienteCache.has(c));
-  if (faltantes.length > 0) {
-    // ORDS pagina (25 por defecto); recorremos todas las páginas para no perder ningún cliente.
-    let offset = 0;
-    for (;;) {
-      const feed = await request<OrdsFeed<Cliente> & { hasMore?: boolean }>(
-        `/clientes/?limit=500&offset=${offset}`,
-      );
-      const items = feed.items ?? [];
-      for (const c of items) clienteCache.set(c.cod_cliente, c.razon_social);
-      if (!feed.hasMore || items.length === 0) break;
-      offset += items.length;
-    }
+  const nombres = new Map<number, string>();
+  // ORDS pagina (25 por defecto); recorremos todas las páginas para no perder ningún cliente.
+  let offset = 0;
+  for (;;) {
+    const feed = await request<OrdsFeed<Cliente> & { hasMore?: boolean }>(
+      `/clientes/?limit=500&offset=${offset}`,
+    );
+    const items = feed.items ?? [];
+    for (const c of items) nombres.set(c.cod_cliente, c.razon_social);
+    if (!feed.hasMore || items.length === 0) break;
+    offset += items.length;
   }
   const out = new Map<number, string>();
-  for (const c of codigos) out.set(c, clienteCache.get(c) ?? `Cliente ${c}`);
+  for (const c of codigos) out.set(c, nombres.get(c) ?? `Cliente ${c}`);
   return out;
 }
 
