@@ -180,10 +180,6 @@ function PreciosPage() {
                 </span>
               </div>
 
-              <div className="mt-3 text-sm">
-                <Stat label={`Con recargo (${p.porcentaje}%)`} value={formatCurrency(p.precio_con_recargo)} />
-              </div>
-
               <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-muted px-3 py-3 sm:px-4">
                 <span className="shrink-0 text-sm font-medium">{p.cantidad_cuotas} cuotas</span>
                 <span className="min-w-0 truncate text-right font-display text-base font-semibold sm:text-lg">
@@ -194,15 +190,6 @@ function PreciosPage() {
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-xs leading-tight text-muted-foreground">{label}</p>
-      <p className="mt-0.5 break-words font-medium tabular-nums">{value}</p>
     </div>
   );
 }
