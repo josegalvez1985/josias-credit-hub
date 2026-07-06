@@ -180,8 +180,7 @@ function PreciosPage() {
                 </span>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:gap-3">
-                <Stat label="Precio base" value={formatCurrency(p.precio_unitario)} />
+              <div className="mt-3 text-sm">
                 <Stat label={`Con recargo (${p.porcentaje}%)`} value={formatCurrency(p.precio_con_recargo)} />
               </div>
 
