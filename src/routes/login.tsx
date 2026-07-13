@@ -138,7 +138,7 @@ function LoginPage() {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="jessicag"
+              placeholder=""
               required
               className="h-11"
             />

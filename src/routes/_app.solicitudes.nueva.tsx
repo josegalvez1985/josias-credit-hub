@@ -53,7 +53,9 @@ const STEPS = [
   { key: "resumen", label: "Resumen", icon: ClipboardCheck },
 ] as const;
 
-type DetalleRow = DetalleInput & { label: string; precio_base: number };
+// total_linea: total de la línea (editable). Se recalcula desde el precio de lista
+// al cambiar la cantidad o el plan de cuotas.
+type DetalleRow = DetalleInput & { label: string; precio_base: number; total_linea: number };
 
 // Formatea un string de dígitos con separador de miles (es-PY usa punto). "" si vacío.
 const fmtMiles = (v: string) => {
@@ -156,26 +158,23 @@ function NewApplication() {
   // El % de recargo lo define la cuota elegida (del plan del primer artículo).
   const interes = opcionesCuotas.find((o) => o.cuotas === cuotas)?.porcentaje ?? 0;
 
+  // Función para redondear hacia arriba a múltiplo de 10.000
+  const redondearMonto = (monto: number) => Math.ceil(monto / 10000) * 10000;
+
   // precio_unitario por línea = precio base + recargo de la cuota elegida.
   const conRecargo = (base: number) => Math.round(base * (1 + interes / 100));
-  // Total calculado a partir de los artículos (con recargo, antes de entrega).
-  const totalCalculado = useMemo(
-    () => detalles.reduce((s, d) => s + d.cantidad * conRecargo(d.precio_base), 0),
-    [detalles, interes],
-  );
+  // Total de línea según precio de lista (con recargo, redondeado a 10.000).
+  const totalLineaLista = (d: { cantidad: number; precio_base: number }) =>
+    redondearMonto(d.cantidad * conRecargo(d.precio_base));
 
-  // Total negociado por el vendedor. null = usa el calculado. Se resetea cuando
-  // cambian los artículos o el recargo (la base ya no aplica).
+  // Total = suma de los totales de línea (cada línea es editable).
+  const totalCalculado = useMemo(() => detalles.reduce((s, d) => s + d.total_linea, 0), [detalles]);
+
+  // Total/cuota negociados. null = usa el calculado.
   const [totalOverride, setTotalOverride] = useState<number | null>(null);
-  useEffect(() => setTotalOverride(null), [detalles, interes]);
+  const [montoCuotaOverride, setMontoCuotaOverride] = useState<number | null>(null);
 
   const total = totalOverride ?? totalCalculado;
-  // Factor para repartir el total negociado proporcionalmente entre las líneas.
-  const factor = totalCalculado > 0 ? total / totalCalculado : 1;
-
-  // Monto de cuota: editable o calculado
-  const [montoCuotaOverride, setMontoCuotaOverride] = useState<number | null>(null);
-  useEffect(() => setMontoCuotaOverride(null), [detalles, interes]);
 
   const montoCuotaCalculado = useMemo(() => {
     const base = Math.max(total - entrega, 0);
@@ -184,23 +183,51 @@ function NewApplication() {
 
   const montoCuota = montoCuotaOverride ?? montoCuotaCalculado;
 
-  // Cuando se edita el monto de cuota, recalcular el total
+  // Reparte un total negociado entre las líneas, proporcional a su precio de lista.
+  const repartirTotal = (t: number) =>
+    setDetalles((arr) => {
+      const calc = arr.map(totalLineaLista);
+      const suma = calc.reduce((a, b) => a + b, 0);
+      if (suma <= 0) return arr;
+      return arr.map((d, i) => ({ ...d, total_linea: Math.round((calc[i] * t) / suma) }));
+    });
+
+  // Al editar la cuota: recalcular el total y repartirlo en las líneas.
   const handleMontoCuotaChange = (newMonto: number) => {
     setMontoCuotaOverride(newMonto);
     const nuevoTotal = newMonto * cuotas + entrega;
     setTotalOverride(nuevoTotal);
+    repartirTotal(nuevoTotal);
   };
 
-  // Cuando se edita el total, recalcular la cuota
+  // Al editar el total: recalcular la cuota y repartirlo en las líneas.
   const handleTotalChange = (newTotal: number) => {
     setTotalOverride(newTotal);
     const base = Math.max(newTotal - entrega, 0);
-    const nuevaCuota = cuotas > 0 ? Math.round(base / cuotas) : 0;
-    setMontoCuotaOverride(nuevaCuota);
+    setMontoCuotaOverride(cuotas > 0 ? Math.round(base / cuotas) : 0);
+    repartirTotal(newTotal);
   };
 
-  // Función para redondear hacia arriba a múltiplo de 10.000
-  const redondearMonto = (monto: number) => Math.ceil(monto / 10000) * 10000;
+  // Vuelve todo al precio de lista.
+  const restablecerMontos = () => {
+    setTotalOverride(null);
+    setMontoCuotaOverride(null);
+    setDetalles((arr) => arr.map((d) => ({ ...d, total_linea: totalLineaLista(d) })));
+  };
+
+  // Si cambia el recargo (plan de cuotas), los montos negociados ya no aplican:
+  // las líneas vuelven al precio de lista con el nuevo recargo.
+  useEffect(() => {
+    setTotalOverride(null);
+    setMontoCuotaOverride(null);
+    setDetalles((arr) =>
+      arr.map((d) => ({
+        ...d,
+        total_linea: redondearMonto(d.cantidad * Math.round(d.precio_base * (1 + interes / 100))),
+      })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interes]);
 
   // Cuando hay plan de cuotas, fija la cantidad de cuotas a una opción válida.
   useEffect(() => {
@@ -214,7 +241,19 @@ function NewApplication() {
     const cantidad = Number(artCantidad) || 0;
     const precio = Number(precioBaseArtSel) || 0;
     if (cantidad <= 0 || precio <= 0) return toast.error("Cantidad y precio deben ser mayores a 0");
-    setDetalles((d) => [...d, { cod_articulo: artSel.value, cantidad, precio_unitario: precio, precio_base: precio, label: artSel.label }]);
+    setDetalles((d) => [
+      ...d,
+      {
+        cod_articulo: artSel.value,
+        cantidad,
+        precio_unitario: precio,
+        precio_base: precio,
+        label: artSel.label,
+        total_linea: redondearMonto(cantidad * conRecargo(precio)),
+      },
+    ]);
+    setTotalOverride(null);
+    setMontoCuotaOverride(null);
     setArtSel(null);
     setArtCantidad("1");
   }
@@ -271,6 +310,11 @@ function NewApplication() {
       return;
     }
 
+    if (detalles.some((d) => d.cantidad <= 0)) {
+      toast.error("Hay artículos con cantidad 0. Corrige la cantidad o quita la línea.");
+      return;
+    }
+
     setLoading(true);
     try {
       const { id } = await crearSolicitud({
@@ -288,9 +332,9 @@ function NewApplication() {
           entrega_inicial: entrega,
           porc_interes: 0, // el recargo ya está incluido en el precio_unitario
         },
-        detalles: detalles.map(({ label: _l, precio_base, ...d }) => ({
+        detalles: detalles.map(({ label: _l, precio_base: _pb, total_linea, ...d }) => ({
           ...d,
-          precio_unitario: Math.round(conRecargo(precio_base) * factor),
+          precio_unitario: d.cantidad > 0 ? Math.round(total_linea / d.cantidad) : 0,
         })),
         referencias: referencias.map(({ relacionLabel: _rl, ...r }) => r),
         actividades: actividades.map(({ profesionLabel: _pl, ciudadLabel: _cl, ...a }) => a),
@@ -419,22 +463,55 @@ function NewApplication() {
             ) : (
               <div className="space-y-2">
                 {detalles.map((d, i) => {
-                  const precioUnitario = redondearMonto(conRecargo(d.precio_base) * factor);
-                  const totalLinea = redondearMonto(d.cantidad * precioUnitario);
                   return (
                   <div key={i} className="flex items-start gap-3 rounded-xl border border-border p-3">
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{d.label}</p>
-                      <p className="text-xs leading-snug text-muted-foreground">
-                        {d.cantidad} × {formatCurrency(precioUnitario)}
-                      </p>
+                      <Input
+                        type="number"
+                        min={1}
+                        inputMode="numeric"
+                        value={d.cantidad || ""}
+                        onChange={(e) => {
+                          const cantidad = Number(e.target.value.replace(/\D/g, "")) || 0;
+                          // Cambiar la cantidad recalcula la línea desde el precio de lista.
+                          setDetalles((arr) =>
+                            arr.map((row, idx) =>
+                              idx === i
+                                ? { ...row, cantidad, total_linea: totalLineaLista({ ...row, cantidad }) }
+                                : row,
+                            ),
+                          );
+                          setTotalOverride(null);
+                          setMontoCuotaOverride(null);
+                        }}
+                        className="mt-1 h-8 w-20 bg-card text-sm"
+                        aria-label="Cantidad"
+                      />
                     </div>
-                    <p className="shrink-0 whitespace-nowrap text-right font-display font-semibold">
-                      {formatCurrency(totalLinea)}
-                    </p>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={d.total_linea ? d.total_linea.toLocaleString("es-PY") : ""}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, "");
+                        setDetalles((arr) =>
+                          arr.map((row, idx) =>
+                            idx === i ? { ...row, total_linea: digits ? Number(digits) : 0 } : row,
+                          ),
+                        );
+                        setTotalOverride(null);
+                        setMontoCuotaOverride(null);
+                      }}
+                      className="h-9 w-28 shrink-0 bg-card text-right font-display font-semibold"
+                    />
                     <button
                       type="button"
-                      onClick={() => setDetalles((arr) => arr.filter((_, idx) => idx !== i))}
+                      onClick={() => {
+                        setDetalles((arr) => arr.filter((_, idx) => idx !== i));
+                        setTotalOverride(null);
+                        setMontoCuotaOverride(null);
+                      }}
                       className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                       aria-label="Quitar"
                     >
@@ -449,7 +526,7 @@ function NewApplication() {
                     <Input
                       type="text"
                       inputMode="numeric"
-                      value={totalOverride !== null ? totalOverride.toLocaleString("es-PY") : redondearMonto(totalCalculado).toLocaleString("es-PY")}
+                      value={totalOverride !== null ? totalOverride.toLocaleString("es-PY") : totalCalculado.toLocaleString("es-PY")}
                       onChange={(e) => {
                         const input = e.target.value.replace(/\D/g, "");
                         if (input) {
@@ -461,18 +538,13 @@ function NewApplication() {
                       }}
                       className="h-9 w-36 bg-card text-right font-display text-lg font-semibold"
                     />
-                    {totalOverride !== null && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTotalOverride(null);
-                          setMontoCuotaOverride(null);
-                        }}
-                        className="text-xs font-medium text-secondary hover:underline"
-                      >
-                        Restablecer
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={restablecerMontos}
+                      className="text-xs font-medium text-secondary hover:underline"
+                    >
+                      Restablecer
+                    </button>
                   </div>
                 </div>
               </div>
@@ -528,7 +600,7 @@ function NewApplication() {
                   {montoCuotaOverride !== null && (
                     <button
                       type="button"
-                      onClick={() => setMontoCuotaOverride(null)}
+                      onClick={restablecerMontos}
                       className="font-medium hover:opacity-100"
                     >
                       Restablecer
