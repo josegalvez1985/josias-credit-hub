@@ -150,7 +150,13 @@ function NewApplication() {
   // ---- Referencias (guardamos el label de la relación solo para mostrar en la lista)
   type RefRow = ReferenciaInput & { relacionLabel: string };
   const [referencias, setReferencias] = useState<RefRow[]>([]);
-  const [refRow, setRefRow] = useState<RefRow>({ relacion: 0, relacionLabel: "", telefono: "", nombre_apellido: "" });
+  const [refRow, setRefRow] = useState<RefRow>({
+    relacion: 0,
+    relacionLabel: "",
+    telefono: "",
+    nombre_apellido: "",
+    ind_garante: "N",
+  });
 
   // ---- Cálculos
   const cuotas = Number(cantidadCuotas) || 1;
@@ -263,7 +269,7 @@ function NewApplication() {
       return toast.error("Nombre y teléfono son obligatorios");
     }
     setReferencias((r) => [...r, refRow]);
-    setRefRow({ relacion: 0, relacionLabel: "", telefono: "", nombre_apellido: "" });
+    setRefRow({ relacion: 0, relacionLabel: "", telefono: "", nombre_apellido: "", ind_garante: "N" });
   }
 
   function addActividad() {
@@ -742,6 +748,15 @@ function NewApplication() {
                   />
                 </Field>
               </div>
+
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-border p-4">
+                <p className="font-medium">¿Es garante?</p>
+                <Switch
+                  checked={refRow.ind_garante === "S"}
+                  onCheckedChange={(v) => setRefRow((r) => ({ ...r, ind_garante: v ? "S" : "N" }))}
+                />
+              </div>
+
               <Button type="button" onClick={addReferencia} className="mt-3">
                 <Plus className="h-4 w-4" /> Agregar referencia
               </Button>
@@ -754,7 +769,14 @@ function NewApplication() {
                 {referencias.map((r, i) => (
                   <div key={i} className="flex items-center gap-3 rounded-xl border border-border p-3">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{r.nombre_apellido}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate font-medium">{r.nombre_apellido}</p>
+                        {r.ind_garante === "S" && (
+                          <span className="shrink-0 rounded-full bg-secondary/15 px-2 py-0.5 text-[10px] font-medium text-secondary">
+                            Garante
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {r.relacionLabel && `${r.relacionLabel} · `}{r.telefono}
                       </p>

@@ -182,6 +182,7 @@ export type ReferenciaInput = {
   relacion: number; // cod_relacion; el handler ORDS bindea :relacion
   telefono: string;
   nombre_apellido: string;
+  ind_garante: string; // 'S' | 'N' — CHK_VENTAS_REF_GARANTE_SOL solo acepta esos valores
 };
 
 export type ActividadInput = {

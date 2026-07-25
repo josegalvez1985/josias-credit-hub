@@ -255,7 +255,14 @@ function SolicitudDetalle() {
           <div className="space-y-2">
             {referencias.map((r) => (
               <div key={r.id_detalle} className="rounded-xl border border-border p-3">
-                <p className="font-medium">{r.nombre_apellido}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="font-medium">{r.nombre_apellido}</p>
+                  {r.ind_garante === "S" && (
+                    <span className="rounded-full bg-secondary/15 px-2 py-0.5 text-[10px] font-medium text-secondary">
+                      Garante
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   {r.relacion ? `${labels.relaciones.get(r.relacion) ?? `Relación ${r.relacion}`} · ` : ""}{r.telefono}
                 </p>
