@@ -167,6 +167,12 @@ Para flujos largos usar el patrón de wizard con `Stepper` de `solicitudes.nueva
 - **[`<AsyncCombobox>`](src/components/async-combobox.tsx)** — selector de LOV. Recibe un
   `fetcher: (q?) => Promise<LovItem[]>`, debounce de 250 ms, y `renderItem` opcional para mostrar
   dos líneas (ej. nombre + CI). Es el reemplazo de todo popup LOV de APEX.
+  > **La búsqueda de los LOV va del lado del cliente**, con `filtrarLov()` de
+  > [src/lib/api.ts](src/lib/api.ts): busca en todos los campos de la fila y, para números,
+  > compara solo dígitos (así `1.554` encuentra `1.554.321` esté guardado con puntos o sin).
+  > No mandar `?q=` al backend: **`q` es un parámetro reservado de ORDS** y nunca llega al handler.
+- **[`<ClienteCombobox>`](src/components/cliente-combobox.tsx)** — el selector de cliente de
+  cobranzas, con su fetcher y su render de dos líneas ya adentro.
 - **[`<BirthdatePicker>`](src/components/birthdate-picker.tsx)** — fecha de nacimiento.
 - **[`<AppHeader>`](src/components/app-header.tsx) / [`<BottomNav>`](src/components/bottom-nav.tsx)** —
   navegación. Están sincronizados: **al agregar una ruta al menú hay que tocar los dos.**

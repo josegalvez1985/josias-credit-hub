@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, Receipt, Check } from "lucide-react";
 import {
   crearRecibo,
   datosCuota,
+  filtrarLov,
   lovRecibos,
   obtenerRecibo,
   type DatosCuota,
@@ -11,6 +12,7 @@ import {
   type ReciboDetalle,
 } from "@/lib/api";
 import { ReciboAcciones, ticketDesdeRecibo } from "@/components/recibo-acciones";
+import { ClienteCombobox } from "@/components/cliente-combobox";
 import { formatCurrency } from "@/lib/credit-applications";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,22 +35,6 @@ export const Route = createFileRoute("/_app/recibos/nuevo")({
 type Opcion = { value: number; label: string };
 
 const hoy = () => new Date().toISOString().slice(0, 10);
-
-// Los LOV de solicitudes y cuotas se traen enteros por cliente/solicitud (son
-// pocos), así que el filtro del buscador se aplica acá.
-function filtrar<T extends LovItem>(items: T[], q?: string): T[] {
-  const term = (q ?? "").trim().toLowerCase();
-  if (!term) return items;
-  const digits = term.replace(/\D/g, "");
-  return items.filter((i) => {
-    const texto = Object.values(i)
-      .map((v) => String(v ?? ""))
-      .join(" ")
-      .toLowerCase();
-    if (texto.includes(term)) return true;
-    return digits ? texto.replace(/\D/g, "").includes(digits) : false;
-  });
-}
 
 function NuevoRecibo() {
   const navigate = useNavigate();
@@ -84,15 +70,13 @@ function NuevoRecibo() {
     setMonto("");
   }
 
-  const fetchClientes = useCallback((q?: string) => lovRecibos.clientes(q), []);
-
   const fetchSolicitudes = useCallback(
-    async (q?: string) => (cliente ? filtrar(await lovRecibos.solicitudes(cliente.value), q) : []),
+    async (q?: string) => (cliente ? filtrarLov(await lovRecibos.solicitudes(cliente.value), q) : []),
     [cliente],
   );
 
   const fetchCuotas = useCallback(
-    async (q?: string) => (solicitud ? filtrar(await lovRecibos.cuotas(solicitud.value), q) : []),
+    async (q?: string) => (solicitud ? filtrarLov(await lovRecibos.cuotas(solicitud.value), q) : []),
     [solicitud],
   );
 
@@ -251,12 +235,9 @@ function NuevoRecibo() {
           <h2 className="font-display text-lg font-semibold">Cuota a cobrar</h2>
 
           <Field label="Cliente" required>
-            <AsyncCombobox
-              title="Cliente"
-              placeholder="Buscar por nombre, CI o RUC..."
+            <ClienteCombobox
               value={cliente?.value ?? null}
               label={cliente?.label ?? null}
-              fetcher={fetchClientes}
               onSelect={elegirCliente}
             />
             <p className="mt-1.5 text-xs text-muted-foreground">

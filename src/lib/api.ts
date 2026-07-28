@@ -453,10 +453,7 @@ export function anularRecibo(pk: ReciboPk, anulado: "S" | "N" = "S") {
 
 // LOVs en cascada del alta: cliente -> solicitud -> cuota.
 export const lovRecibos = {
-  clientes: (q?: string) =>
-    request<OrdsFeed<LovItem & { ci?: string; ruc?: string; nro_telefono?: string }>>(
-      `/recibos/lov/clientes?limit=500${q ? `&q=${encodeURIComponent(q)}` : ""}`,
-    ).then((r) => r.items ?? []),
+  clientes: buscarClientesRecibos,
   solicitudes: (codCliente: number) =>
     request<OrdsFeed<LovItem & { nro_solicitud: number; saldo_total: number }>>(
       `/recibos/lov/solicitudes/${codCliente}?limit=500`,
@@ -468,6 +465,55 @@ export const lovRecibos = {
       `/recibos/lov/cuotas/${idSolicitud}?limit=500${conSaldo ? "&con_saldo=S" : ""}`,
     ).then((r) => r.items ?? []),
 };
+
+export type ClienteRecibosLov = LovItem & {
+  ci?: string;
+  ruc?: string;
+  nro_telefono?: string;
+  nombre_fantasia?: string;
+};
+
+// Filtra un LOV por cualquiera de sus campos, sin distinguir mayúsculas.
+// Para números compara solo dígitos de los dos lados, así "1.554" encuentra al
+// CI "1.554.321" esté guardado con puntos o sin ellos.
+//
+// Va del lado del cliente a propósito: `q` es un parámetro RESERVADO de ORDS
+// (lo usa para su filtro JSON `?q={"col":"valor"}`), así que mandarlo como
+// query param no llega nunca al bind del handler. Es el mismo patrón que usan
+// `feed()` y `buscarClientesLov` para los LOVs de solicitudes.
+export function filtrarLov<T extends LovItem>(items: T[], q?: string): T[] {
+  const term = (q ?? "").trim().toLowerCase();
+  if (!term) return items;
+  const digits = term.replace(/\D/g, "");
+  return items.filter((i) => {
+    const texto = Object.values(i)
+      .map((v) => String(v ?? ""))
+      .join(" ")
+      .toLowerCase();
+    if (texto.includes(term)) return true;
+    return digits ? texto.replace(/\D/g, "").includes(digits) : false;
+  });
+}
+
+// Trae todos los clientes con cuotas pendientes, recorriendo las páginas de ORDS.
+async function todosClientesRecibos(): Promise<ClienteRecibosLov[]> {
+  const out: ClienteRecibosLov[] = [];
+  let offset = 0;
+  for (;;) {
+    const f = await request<OrdsFeed<ClienteRecibosLov> & { hasMore?: boolean }>(
+      `/recibos/lov/clientes?limit=500&offset=${offset}`,
+    );
+    const items = f.items ?? [];
+    out.push(...items);
+    if (!f.hasMore || items.length === 0) break;
+    offset += items.length;
+  }
+  return out;
+}
+
+async function buscarClientesRecibos(q?: string): Promise<ClienteRecibosLov[]> {
+  return filtrarLov(await todosClientesRecibos(), q);
+}
 
 export type CuotaLov = LovItem & {
   nro_cuota: number;

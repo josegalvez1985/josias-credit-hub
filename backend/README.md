@@ -143,6 +143,12 @@ En orden, hasta que uno funcione:
 - **Los GET no llaman a paquetes.** Si un `SELECT` invoca una función de un
   paquete inválido, todo el endpoint devuelve 500. Los handlers de lectura de
   `clientes` y `solicitudes` son SQL puro; conviene mantener esa línea.
+- **`q` es un parámetro reservado de ORDS.** Lo usa para su filtro JSON
+  (`?q={"col":"valor"}`), así que un bind `:q` en el handler **nunca recibe el
+  valor** y el filtro parece no andar, sin error ni pista. Por eso ningún LOV
+  filtra del lado de Oracle: devuelven la lista completa y el cliente busca con
+  `filtrarLov()` en `src/lib/api.ts`. Si de verdad hace falta filtrar en la base,
+  usar otro nombre (`buscar`, `texto`) y declararlo con `ORDS.DEFINE_PARAMETER`.
 
 ## Cómo agregar un campo nuevo (checklist)
 

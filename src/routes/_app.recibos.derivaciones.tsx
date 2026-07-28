@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Share2, Loader2, Check, AlertCircle } from "lucide-react";
 import {
   derivarCuota,
+  filtrarLov,
   lovRecibos,
   type CuotaLov,
   type LovItem,
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AsyncCombobox } from "@/components/async-combobox";
+import { ClienteCombobox } from "@/components/cliente-combobox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,20 +41,6 @@ type Opcion = { value: number; label: string };
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
-function filtrar<T extends LovItem>(items: T[], q?: string): T[] {
-  const term = (q ?? "").trim().toLowerCase();
-  if (!term) return items;
-  const digits = term.replace(/\D/g, "");
-  return items.filter((i) => {
-    const texto = Object.values(i)
-      .map((v) => String(v ?? ""))
-      .join(" ")
-      .toLowerCase();
-    if (texto.includes(term)) return true;
-    return digits ? texto.replace(/\D/g, "").includes(digits) : false;
-  });
-}
-
 function Derivaciones() {
   const [cliente, setCliente] = useState<Opcion | null>(null);
   const [solicitud, setSolicitud] = useState<Opcion | null>(null);
@@ -72,17 +60,15 @@ function Derivaciones() {
     setCuota(null);
   }
 
-  const fetchClientes = useCallback((q?: string) => lovRecibos.clientes(q), []);
-
   const fetchSolicitudes = useCallback(
-    async (q?: string) => (cliente ? filtrar(await lovRecibos.solicitudes(cliente.value), q) : []),
+    async (q?: string) => (cliente ? filtrarLov(await lovRecibos.solicitudes(cliente.value), q) : []),
     [cliente],
   );
 
   // A diferencia de recibos, acá el LOV solo trae cuotas con saldo pendiente:
   // es el filtro `and nvl(saldo_cuota,0) <> 0` de la página 4.
   const fetchCuotas = useCallback(
-    async (q?: string) => (solicitud ? filtrar(await lovRecibos.cuotas(solicitud.value, true), q) : []),
+    async (q?: string) => (solicitud ? filtrarLov(await lovRecibos.cuotas(solicitud.value, true), q) : []),
     [solicitud],
   );
 
@@ -133,12 +119,9 @@ function Derivaciones() {
       <form onSubmit={onSubmit} className="space-y-6" autoComplete="off">
         <Card className="space-y-5 p-6">
           <Field label="Cliente" required>
-            <AsyncCombobox
-              title="Cliente"
-              placeholder="Buscar por nombre, CI o RUC..."
+            <ClienteCombobox
               value={cliente?.value ?? null}
               label={cliente?.label ?? null}
-              fetcher={fetchClientes}
               onSelect={elegirCliente}
             />
           </Field>

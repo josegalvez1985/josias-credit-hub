@@ -1031,9 +1031,20 @@ BEGIN
       p_mimes_allowed  => NULL,
       p_comments       => NULL,
       p_source         =>
+-- Sin filtro de búsqueda: devuelve la lista completa y el cliente filtra.
+--
+-- OJO: NO agregar un bind `:q` acá. En ORDS `q` es un parámetro RESERVADO
+-- (lo usa para su filtro JSON `?q={"col":"valor"}`), así que jamás llega al
+-- handler y el filtro parece "no andar". Es el mismo motivo por el que
+-- solicitudes/lov/clientes tampoco filtra en el servidor y src/lib/api.ts
+-- resuelve la búsqueda con filtrarLov(). Si alguna vez hace falta filtrar del
+-- lado de Oracle, usar otro nombre de parámetro (`buscar`, por ejemplo).
+--
+-- Se devuelven todos los campos útiles (fantasía, CI, RUC, teléfono) porque el
+-- filtro del cliente busca sobre TODOS los valores de cada fila.
 '      SELECT cl.cod_cliente                                        AS value,
              NVL(cl.ci, cl.ruc) || '' '' || cl.razon_social         AS label,
-             cl.ci, cl.ruc, cl.nro_telefono
+             cl.ci, cl.ruc, cl.nro_telefono, cl.nombre_fantasia
       FROM   clientes cl
       WHERE  cl.razon_social IS NOT NULL
       AND    EXISTS (SELECT 1
@@ -1041,9 +1052,6 @@ BEGIN
                      JOIN   ventas_cuotas  c1 ON c.id = c1.id
                      WHERE  c.cod_cliente = cl.cod_cliente
                      AND    NVL(c1.saldo_cuota, 0) <> 0)
-      AND   (:q IS NULL
-             OR UPPER(cl.razon_social) LIKE ''%'' || UPPER(:q) || ''%''
-             OR REPLACE(NVL(cl.ci, cl.ruc), ''.'', '''') LIKE ''%'' || REPLACE(:q, ''.'', '''') || ''%'')
       ORDER BY cl.razon_social ASC
     ');
 
