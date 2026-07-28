@@ -364,6 +364,151 @@ export async function listarPrecios(): Promise<PrecioVenta[]> {
   return out;
 }
 
+// ----- Recibos (modulo ORDS "recibos") -----
+export type Recibo = {
+  nro_recibo: number;
+  fecha_recibo: string; // YYYY-MM-DD
+  cod_cliente: number;
+  nombre: string;
+  nro_telefono?: string;
+  concepto?: string;
+  nro_solicitud: number;
+  nro_cuota: number;
+  monto: number;
+  total_interes?: number;
+  id_solicitud: number;
+  id_cuota: number;
+  anulado: string; // 'S' | 'N'
+  cod_usuario?: string;
+};
+
+export type ReciboDetalle = Recibo & {
+  documento?: string;
+  razon_social?: string;
+  monto_cuota?: number;
+  saldo_cuota?: number;
+  fec_vencimiento?: string;
+  cuota_texto?: string;
+  nombre_usuario?: string;
+  monto_letras?: string;
+};
+
+export type FiltroRecibos = {
+  q?: string;
+  desde?: string; // YYYY-MM-DD
+  hasta?: string; // YYYY-MM-DD
+  anulados?: "S" | "N" | "T"; // T = todos
+  limit?: number;
+  offset?: number;
+};
+
+// A diferencia del resto de la app, recibos NO se trae entero: son 130.000+ filas.
+// El servidor pagina y busca; acá solo se arman los query params.
+export async function listarRecibos(f: FiltroRecibos = {}) {
+  const qs = new URLSearchParams();
+  if (f.q?.trim()) qs.set("q", f.q.trim());
+  if (f.desde) qs.set("desde", f.desde);
+  if (f.hasta) qs.set("hasta", f.hasta);
+  if (f.anulados) qs.set("anulados", f.anulados);
+  qs.set("limit", String(f.limit ?? 50));
+  qs.set("offset", String(f.offset ?? 0));
+  const r = await request<{ items: Recibo[]; hasMore?: boolean }>(`/recibos/?${qs}`);
+  return { items: r.items ?? [], hasMore: Boolean(r.hasMore) };
+}
+
+// La PK es (nro_recibo, id_solicitud, id_cuota), asi que el backend devuelve una
+// lista. En la practica es una sola fila.
+export async function obtenerRecibo(nroRecibo: number) {
+  const r = await request<{ items: ReciboDetalle[] }>(`/recibos/${nroRecibo}`);
+  return r.items?.[0] ?? null;
+}
+
+export type ReciboInput = {
+  cod_cliente: number;
+  id_solicitud: number;
+  id_cuota: number;
+  monto: number;
+  fecha_recibo?: string; // YYYY-MM-DD; si falta, el backend usa SYSDATE
+  concepto?: string;
+};
+
+// cod_usuario lo pone el backend desde el token, no se manda.
+export function crearRecibo(r: ReciboInput) {
+  return request<{ nro_recibo: number }>("/recibos/", {
+    method: "POST",
+    body: JSON.stringify(r),
+  });
+}
+
+export type ReciboPk = { nro_recibo: number; id_solicitud: number; id_cuota: number };
+
+export function actualizarRecibo(pk: ReciboPk, cambios: { monto: number; concepto?: string; fecha_recibo?: string }) {
+  return request("/recibos/", { method: "PUT", body: JSON.stringify({ ...pk, ...cambios }) });
+}
+
+// anulado 'S' anula y devuelve el saldo a la cuota; 'N' reactiva el recibo.
+export function anularRecibo(pk: ReciboPk, anulado: "S" | "N" = "S") {
+  return request("/recibos/anular", { method: "POST", body: JSON.stringify({ ...pk, anulado }) });
+}
+
+// LOVs en cascada del alta: cliente -> solicitud -> cuota.
+export const lovRecibos = {
+  clientes: (q?: string) =>
+    request<OrdsFeed<LovItem & { ci?: string; ruc?: string; nro_telefono?: string }>>(
+      `/recibos/lov/clientes?limit=500${q ? `&q=${encodeURIComponent(q)}` : ""}`,
+    ).then((r) => r.items ?? []),
+  solicitudes: (codCliente: number) =>
+    request<OrdsFeed<LovItem & { nro_solicitud: number; saldo_total: number }>>(
+      `/recibos/lov/solicitudes/${codCliente}?limit=500`,
+    ).then((r) => r.items ?? []),
+  // conSaldo deja solo las cuotas con saldo pendiente: así lo hace el LOV de
+  // derivaciones (página 4). El de recibos (página 3) las trae todas.
+  cuotas: (idSolicitud: number, conSaldo = false) =>
+    request<OrdsFeed<CuotaLov>>(
+      `/recibos/lov/cuotas/${idSolicitud}?limit=500${conSaldo ? "&con_saldo=S" : ""}`,
+    ).then((r) => r.items ?? []),
+};
+
+export type CuotaLov = LovItem & {
+  nro_cuota: number;
+  monto_cuota: number;
+  saldo_cuota: number;
+  fec_vencimiento?: string;
+  fec_derivacion?: string;
+};
+
+// Marca la fecha en que la cuota pasó a gestión de cobranza (VENTAS_CUOTAS.FEC_DERIVACION).
+export function derivarCuota(idSolicitud: number, idCuota: number, fechaDerivacion: string) {
+  return request("/recibos/derivar", {
+    method: "POST",
+    body: JSON.stringify({
+      id_solicitud: idSolicitud,
+      id_cuota: idCuota,
+      fecha_derivacion: fechaDerivacion,
+    }),
+  });
+}
+
+// Saldo, interes, vencimiento y concepto sugerido de una cuota.
+// Equivale a la accion dinamica CALCULOS de la pagina 3 de APEX.
+export type DatosCuota = {
+  saldo_cuota: number;
+  total_interes: number;
+  fec_vencimiento?: string;
+  concepto?: string;
+  cuota_texto?: string;
+};
+
+export function datosCuota(codCliente: number, idSolicitud: number, idCuota: number) {
+  return request<DatosCuota>(`/recibos/cuota/${codCliente}/${idSolicitud}/${idCuota}`);
+}
+
+// NUM_LETRAS vive en Oracle; no se reimplementa en JS para que el recibo impreso
+// diga exactamente lo mismo que el de la app vieja.
+export function montoEnLetras(monto: number) {
+  return request<{ monto_letras: string }>(`/recibos/letras/${monto}`).then((r) => r.monto_letras);
+}
+
 // Crea la solicitud completa de forma secuencial: cabecera -> hijos.
 // Si falla a mitad, lanza error indicando el paso (puede quedar data parcial).
 export async function crearSolicitud(s: SolicitudCompleta): Promise<{ id: number }> {

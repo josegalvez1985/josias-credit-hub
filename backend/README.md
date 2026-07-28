@@ -15,13 +15,20 @@ Todo lo que necesita ese endpoint está en su archivo, no hay que saltar entre c
 | --- | --- | --- |
 | `auth.sql` | `/auth/login` | `auth_tokens` + `pkg_auth_token` + módulo ORDS `auth` |
 | `solicitudes.sql` | `/solicitudes/*` | `solicitud_ventas_referencias` + `pkg_solicitud_ventas` + módulo ORDS `solicitudes` (cabecera, detalle, referencias, actividad, LOVs, precios) |
-| `migrations/*.sql` | — | Cambios incrementales sobre una base que **ya está en producción**. Nombre: `YYYY-MM-DD_descripcion.sql`. |
+| `recibos.sql` | `/recibos/*` | `pkg_recibos` + módulo ORDS `recibos` (listado, alta, edición, anulación, LOVs) |
 
-Cada archivo de endpoint tiene tres secciones numeradas:
+**Todo lo de un módulo va en su archivo**, incluidos los cambios de esquema.
+No hay carpeta `migrations/`: los `ALTER`/`DROP` van en una sección de saneamiento
+al principio del mismo archivo, comentados y con su rollback (ver `recibos.sql` §1).
 
-1. **Tablas** — solo para base nueva. En una base ya desplegada, saltear y usar `migrations/`.
+Secciones de un archivo de endpoint:
+
+1. **Tablas / saneamiento** — DDL para base nueva, o los cambios incrementales
+   sobre producción. Es la única sección que **no** es idempotente: se corre a mano.
 2. **Paquete** — `CREATE OR REPLACE`, se puede volver a correr siempre.
-3. **Módulo ORDS** — idempotente, redefine el módulo completo.
+3. **Módulo ORDS** — arranca con `ORDS.DELETE_MODULE` y después redefine todo
+   (ver *Desplegar un módulo* más abajo).
+4. **Verificación** — consultas sueltas, no forman parte del despliegue.
 
 > El paquete es compartido por todos los paths del módulo (`cabecera`, `detalle`,
 > `referencias`…), por eso la unidad de archivo es el módulo REST y no cada path
@@ -35,10 +42,78 @@ Conectado como `WKSP_JOSIASMUEBLES`, en SQL Developer / SQLcl:
 -- base nueva: el archivo entero, de arriba a abajo
 @auth.sql
 @solicitudes.sql
+@recibos.sql
 
--- base ya desplegada: solo la migración + secciones 2 y 3 del endpoint tocado
-@migrations/2026-07-24_referencias_ind_garante.sql
+-- base ya desplegada: correr solo las secciones 2 y 3 del endpoint tocado.
+-- La sección 1 (saneamiento) se lee y se aplica a mano, paso por paso.
 ```
+
+### Desplegar un módulo ORDS
+
+`ORDS.DEFINE_MODULE` **no es idempotente**: si el módulo ya existe falla con
+`ORA-00001` sobre `ORDS_MODULES_UNIQUE1`. Por eso la sección 3 arranca borrando.
+
+```sql
+DECLARE
+  l_existe NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO l_existe FROM user_ords_modules WHERE name = '<modulo>';
+  IF l_existe > 0 THEN
+    ORDS.DELETE_MODULE(p_module_name => '<modulo>');
+    COMMIT;
+  END IF;
+END;
+/
+```
+
+Tres reglas que costaron una tarde entera el 2026-07-28:
+
+1. **Nunca `EXCEPTION WHEN OTHERS THEN NULL` en el borrado.** Si el `DELETE_MODULE`
+   falla, SQL Developer reporta *"Sentencia procesada"* igual y después el
+   `DEFINE_MODULE` choca con `ORA-00001` sin que se entienda por qué. Que falle
+   fuerte. Por eso el bloque de arriba pregunta si existe en vez de atrapar errores.
+2. **Correr la sección 3 sola**, no pegada al resto, y mirar el tiempo. Si el
+   bloque tarda **~13 segundos**, no está trabajando: está esperando un lock hasta
+   que Oracle declara el interbloqueo.
+3. **Verificar antes de seguir.** `SELECT COUNT(*) ... WHERE name = '<modulo>'`
+   tiene que dar `0` antes de redefinir.
+
+Al terminar, comprobar que estén todos los handlers:
+
+```sql
+SELECT t.uri_template, h.method
+  FROM user_ords_modules p
+  JOIN user_ords_templates t ON t.module_id = p.id
+  JOIN user_ords_handlers  h ON h.template_id = t.id
+ WHERE p.name = '<modulo>'
+ ORDER BY t.uri_template, h.method;
+```
+
+### Si el despliegue deja el módulo trabado (ORA-00060)
+
+Cuando un `DEFINE_MODULE` falla a mitad de camino, deja el módulo **a medias**:
+la fila existe en `ORDS_METADATA.ORDS_MODULES`, responde `500` a todo, y el
+`DELETE_MODULE` empieza a dar `ORA-00060` (deadlock en la metadata de ORDS).
+
+En orden, hasta que uno funcione:
+
+1. **`ROLLBACK`, cerrar todas las pestañas** de SQL Developer Web / APEX, esperar
+   1-2 minutos y volver a entrar en una sola. La sesión huérfana del intento
+   fallido es la que retiene el lock.
+2. **Correr el `DELETE_MODULE` solo**, sin nada más en el script:
+   ```sql
+   BEGIN
+     ORDS.DELETE_MODULE(p_module_name => '<modulo>');
+     COMMIT;
+   END;
+   /
+   ```
+   Repetir unas cuantas veces si hace falta — el lock termina soltándose.
+3. **Borrarlo desde la interfaz**: SQL Developer Web → REST → Modules → módulo →
+   *Delete*. ORDS maneja la transacción por dentro.
+4. **Último recurso: renombrar el módulo** (`recibos` → `cobranzas`, con su base
+   path) y ajustar las rutas en `src/lib/api.ts`. La fila trabada queda muerta y se
+   borra otro día. Es feo pero destraba en dos minutos.
 
 ## Convenciones
 
@@ -58,6 +133,16 @@ Conectado como `WKSP_JOSIASMUEBLES`, en SQL Developer / SQLcl:
   todas las páginas con `limit=500&offset=`; si agregás un feed nuevo, seguí ese patrón.
 - **Comillas**: el cuerpo de un handler va dentro de un literal SQL, así que cada
   `'` interno se escribe `''`.
+- **Un error de CORS suele ser un 500 disfrazado.** Ningún módulo de este schema
+  define `origins_allowed` y todos funcionan, así que si el navegador dice
+  *"No 'Access-Control-Allow-Origin' header is present"*, lo que pasó es que el
+  handler explotó: ORDS devuelve el 500 sin cabeceras CORS y el browser tapa el
+  mensaje real. Diagnóstico: `curl -i` contra el endpoint para ver el cuerpo, y
+  `SELECT object_name, status FROM user_objects` para ver si el paquete quedó
+  `INVALID`.
+- **Los GET no llaman a paquetes.** Si un `SELECT` invoca una función de un
+  paquete inválido, todo el endpoint devuelve 500. Los handlers de lectura de
+  `clientes` y `solicitudes` son SQL puro; conviene mantener esa línea.
 
 ## Cómo agregar un campo nuevo (checklist)
 

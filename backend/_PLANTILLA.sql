@@ -69,8 +69,23 @@ END pkg_<modulo>;
 
 
 -- ---------------------------------------------------------------------
--- 2. MÓDULO ORDS  (idempotente: redefine el módulo completo)
+-- 2. MÓDULO ORDS
 -- ---------------------------------------------------------------------
+-- ORDS.DEFINE_MODULE **no** es idempotente: si el módulo ya existe falla con
+-- ORA-00001 sobre ORDS_MODULES_UNIQUE1. Siempre borrar primero.
+-- Sin EXCEPTION: si el DELETE falla (ORA-00060 por otra sesión trabada) hay que
+-- enterarse, no taparlo.
+DECLARE
+  l_existe NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO l_existe FROM user_ords_modules WHERE name = '<modulo>';
+  IF l_existe > 0 THEN
+    ORDS.DELETE_MODULE(p_module_name => '<modulo>');
+    COMMIT;
+  END IF;
+END;
+/
+
 DECLARE
 
   l_roles     OWA.VC_ARR;

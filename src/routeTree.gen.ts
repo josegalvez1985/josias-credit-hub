@@ -13,12 +13,20 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRecibosRouteImport } from './routes/_app.recibos'
 import { Route as AppPreciosRouteImport } from './routes/_app.precios'
 import { Route as AppPerfilRouteImport } from './routes/_app.perfil'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppSolicitudesIndexRouteImport } from './routes/_app.solicitudes.index'
+import { Route as AppRecibosIndexRouteImport } from './routes/_app.recibos.index'
 import { Route as AppSolicitudesNuevaRouteImport } from './routes/_app.solicitudes.nueva'
 import { Route as AppSolicitudesIdRouteImport } from './routes/_app.solicitudes.$id'
+import { Route as AppRecibosUbicacionesRouteImport } from './routes/_app.recibos.ubicaciones'
+import { Route as AppRecibosPreciosArticulosRouteImport } from './routes/_app.recibos.precios-articulos'
+import { Route as AppRecibosNuevoRouteImport } from './routes/_app.recibos.nuevo'
+import { Route as AppRecibosDerivacionesRouteImport } from './routes/_app.recibos.derivaciones'
+import { Route as AppRecibosClientesRouteImport } from './routes/_app.recibos.clientes'
+import { Route as AppRecibosCargarUbicacionRouteImport } from './routes/_app.recibos.cargar-ubicacion'
 import { Route as AppClientesNuevoRouteImport } from './routes/_app.clientes.nuevo'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -40,6 +48,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRecibosRoute = AppRecibosRouteImport.update({
+  id: '/recibos',
+  path: '/recibos',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPreciosRoute = AppPreciosRouteImport.update({
   id: '/precios',
   path: '/precios',
@@ -60,6 +73,11 @@ const AppSolicitudesIndexRoute = AppSolicitudesIndexRouteImport.update({
   path: '/solicitudes/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppRecibosIndexRoute = AppRecibosIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRecibosRoute,
+} as any)
 const AppSolicitudesNuevaRoute = AppSolicitudesNuevaRouteImport.update({
   id: '/solicitudes/nueva',
   path: '/solicitudes/nueva',
@@ -70,6 +88,38 @@ const AppSolicitudesIdRoute = AppSolicitudesIdRouteImport.update({
   path: '/solicitudes/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppRecibosUbicacionesRoute = AppRecibosUbicacionesRouteImport.update({
+  id: '/ubicaciones',
+  path: '/ubicaciones',
+  getParentRoute: () => AppRecibosRoute,
+} as any)
+const AppRecibosPreciosArticulosRoute =
+  AppRecibosPreciosArticulosRouteImport.update({
+    id: '/precios-articulos',
+    path: '/precios-articulos',
+    getParentRoute: () => AppRecibosRoute,
+  } as any)
+const AppRecibosNuevoRoute = AppRecibosNuevoRouteImport.update({
+  id: '/nuevo',
+  path: '/nuevo',
+  getParentRoute: () => AppRecibosRoute,
+} as any)
+const AppRecibosDerivacionesRoute = AppRecibosDerivacionesRouteImport.update({
+  id: '/derivaciones',
+  path: '/derivaciones',
+  getParentRoute: () => AppRecibosRoute,
+} as any)
+const AppRecibosClientesRoute = AppRecibosClientesRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
+  getParentRoute: () => AppRecibosRoute,
+} as any)
+const AppRecibosCargarUbicacionRoute =
+  AppRecibosCargarUbicacionRouteImport.update({
+    id: '/cargar-ubicacion',
+    path: '/cargar-ubicacion',
+    getParentRoute: () => AppRecibosRoute,
+  } as any)
 const AppClientesNuevoRoute = AppClientesNuevoRouteImport.update({
   id: '/clientes/nuevo',
   path: '/clientes/nuevo',
@@ -83,9 +133,17 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AppDashboardRoute
   '/perfil': typeof AppPerfilRoute
   '/precios': typeof AppPreciosRoute
+  '/recibos': typeof AppRecibosRouteWithChildren
   '/clientes/nuevo': typeof AppClientesNuevoRoute
+  '/recibos/cargar-ubicacion': typeof AppRecibosCargarUbicacionRoute
+  '/recibos/clientes': typeof AppRecibosClientesRoute
+  '/recibos/derivaciones': typeof AppRecibosDerivacionesRoute
+  '/recibos/nuevo': typeof AppRecibosNuevoRoute
+  '/recibos/precios-articulos': typeof AppRecibosPreciosArticulosRoute
+  '/recibos/ubicaciones': typeof AppRecibosUbicacionesRoute
   '/solicitudes/$id': typeof AppSolicitudesIdRoute
   '/solicitudes/nueva': typeof AppSolicitudesNuevaRoute
+  '/recibos/': typeof AppRecibosIndexRoute
   '/solicitudes/': typeof AppSolicitudesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -96,8 +154,15 @@ export interface FileRoutesByTo {
   '/perfil': typeof AppPerfilRoute
   '/precios': typeof AppPreciosRoute
   '/clientes/nuevo': typeof AppClientesNuevoRoute
+  '/recibos/cargar-ubicacion': typeof AppRecibosCargarUbicacionRoute
+  '/recibos/clientes': typeof AppRecibosClientesRoute
+  '/recibos/derivaciones': typeof AppRecibosDerivacionesRoute
+  '/recibos/nuevo': typeof AppRecibosNuevoRoute
+  '/recibos/precios-articulos': typeof AppRecibosPreciosArticulosRoute
+  '/recibos/ubicaciones': typeof AppRecibosUbicacionesRoute
   '/solicitudes/$id': typeof AppSolicitudesIdRoute
   '/solicitudes/nueva': typeof AppSolicitudesNuevaRoute
+  '/recibos': typeof AppRecibosIndexRoute
   '/solicitudes': typeof AppSolicitudesIndexRoute
 }
 export interface FileRoutesById {
@@ -109,9 +174,17 @@ export interface FileRoutesById {
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/perfil': typeof AppPerfilRoute
   '/_app/precios': typeof AppPreciosRoute
+  '/_app/recibos': typeof AppRecibosRouteWithChildren
   '/_app/clientes/nuevo': typeof AppClientesNuevoRoute
+  '/_app/recibos/cargar-ubicacion': typeof AppRecibosCargarUbicacionRoute
+  '/_app/recibos/clientes': typeof AppRecibosClientesRoute
+  '/_app/recibos/derivaciones': typeof AppRecibosDerivacionesRoute
+  '/_app/recibos/nuevo': typeof AppRecibosNuevoRoute
+  '/_app/recibos/precios-articulos': typeof AppRecibosPreciosArticulosRoute
+  '/_app/recibos/ubicaciones': typeof AppRecibosUbicacionesRoute
   '/_app/solicitudes/$id': typeof AppSolicitudesIdRoute
   '/_app/solicitudes/nueva': typeof AppSolicitudesNuevaRoute
+  '/_app/recibos/': typeof AppRecibosIndexRoute
   '/_app/solicitudes/': typeof AppSolicitudesIndexRoute
 }
 export interface FileRouteTypes {
@@ -123,9 +196,17 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/perfil'
     | '/precios'
+    | '/recibos'
     | '/clientes/nuevo'
+    | '/recibos/cargar-ubicacion'
+    | '/recibos/clientes'
+    | '/recibos/derivaciones'
+    | '/recibos/nuevo'
+    | '/recibos/precios-articulos'
+    | '/recibos/ubicaciones'
     | '/solicitudes/$id'
     | '/solicitudes/nueva'
+    | '/recibos/'
     | '/solicitudes/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -136,8 +217,15 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/precios'
     | '/clientes/nuevo'
+    | '/recibos/cargar-ubicacion'
+    | '/recibos/clientes'
+    | '/recibos/derivaciones'
+    | '/recibos/nuevo'
+    | '/recibos/precios-articulos'
+    | '/recibos/ubicaciones'
     | '/solicitudes/$id'
     | '/solicitudes/nueva'
+    | '/recibos'
     | '/solicitudes'
   id:
     | '__root__'
@@ -148,9 +236,17 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/perfil'
     | '/_app/precios'
+    | '/_app/recibos'
     | '/_app/clientes/nuevo'
+    | '/_app/recibos/cargar-ubicacion'
+    | '/_app/recibos/clientes'
+    | '/_app/recibos/derivaciones'
+    | '/_app/recibos/nuevo'
+    | '/_app/recibos/precios-articulos'
+    | '/_app/recibos/ubicaciones'
     | '/_app/solicitudes/$id'
     | '/_app/solicitudes/nueva'
+    | '/_app/recibos/'
     | '/_app/solicitudes/'
   fileRoutesById: FileRoutesById
 }
@@ -191,6 +287,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/recibos': {
+      id: '/_app/recibos'
+      path: '/recibos'
+      fullPath: '/recibos'
+      preLoaderRoute: typeof AppRecibosRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/precios': {
       id: '/_app/precios'
       path: '/precios'
@@ -219,6 +322,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSolicitudesIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/recibos/': {
+      id: '/_app/recibos/'
+      path: '/'
+      fullPath: '/recibos/'
+      preLoaderRoute: typeof AppRecibosIndexRouteImport
+      parentRoute: typeof AppRecibosRoute
+    }
     '/_app/solicitudes/nueva': {
       id: '/_app/solicitudes/nueva'
       path: '/solicitudes/nueva'
@@ -233,6 +343,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSolicitudesIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/recibos/ubicaciones': {
+      id: '/_app/recibos/ubicaciones'
+      path: '/ubicaciones'
+      fullPath: '/recibos/ubicaciones'
+      preLoaderRoute: typeof AppRecibosUbicacionesRouteImport
+      parentRoute: typeof AppRecibosRoute
+    }
+    '/_app/recibos/precios-articulos': {
+      id: '/_app/recibos/precios-articulos'
+      path: '/precios-articulos'
+      fullPath: '/recibos/precios-articulos'
+      preLoaderRoute: typeof AppRecibosPreciosArticulosRouteImport
+      parentRoute: typeof AppRecibosRoute
+    }
+    '/_app/recibos/nuevo': {
+      id: '/_app/recibos/nuevo'
+      path: '/nuevo'
+      fullPath: '/recibos/nuevo'
+      preLoaderRoute: typeof AppRecibosNuevoRouteImport
+      parentRoute: typeof AppRecibosRoute
+    }
+    '/_app/recibos/derivaciones': {
+      id: '/_app/recibos/derivaciones'
+      path: '/derivaciones'
+      fullPath: '/recibos/derivaciones'
+      preLoaderRoute: typeof AppRecibosDerivacionesRouteImport
+      parentRoute: typeof AppRecibosRoute
+    }
+    '/_app/recibos/clientes': {
+      id: '/_app/recibos/clientes'
+      path: '/clientes'
+      fullPath: '/recibos/clientes'
+      preLoaderRoute: typeof AppRecibosClientesRouteImport
+      parentRoute: typeof AppRecibosRoute
+    }
+    '/_app/recibos/cargar-ubicacion': {
+      id: '/_app/recibos/cargar-ubicacion'
+      path: '/cargar-ubicacion'
+      fullPath: '/recibos/cargar-ubicacion'
+      preLoaderRoute: typeof AppRecibosCargarUbicacionRouteImport
+      parentRoute: typeof AppRecibosRoute
+    }
     '/_app/clientes/nuevo': {
       id: '/_app/clientes/nuevo'
       path: '/clientes/nuevo'
@@ -243,10 +395,35 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppRecibosRouteChildren {
+  AppRecibosCargarUbicacionRoute: typeof AppRecibosCargarUbicacionRoute
+  AppRecibosClientesRoute: typeof AppRecibosClientesRoute
+  AppRecibosDerivacionesRoute: typeof AppRecibosDerivacionesRoute
+  AppRecibosNuevoRoute: typeof AppRecibosNuevoRoute
+  AppRecibosPreciosArticulosRoute: typeof AppRecibosPreciosArticulosRoute
+  AppRecibosUbicacionesRoute: typeof AppRecibosUbicacionesRoute
+  AppRecibosIndexRoute: typeof AppRecibosIndexRoute
+}
+
+const AppRecibosRouteChildren: AppRecibosRouteChildren = {
+  AppRecibosCargarUbicacionRoute: AppRecibosCargarUbicacionRoute,
+  AppRecibosClientesRoute: AppRecibosClientesRoute,
+  AppRecibosDerivacionesRoute: AppRecibosDerivacionesRoute,
+  AppRecibosNuevoRoute: AppRecibosNuevoRoute,
+  AppRecibosPreciosArticulosRoute: AppRecibosPreciosArticulosRoute,
+  AppRecibosUbicacionesRoute: AppRecibosUbicacionesRoute,
+  AppRecibosIndexRoute: AppRecibosIndexRoute,
+}
+
+const AppRecibosRouteWithChildren = AppRecibosRoute._addFileChildren(
+  AppRecibosRouteChildren,
+)
+
 interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppPerfilRoute: typeof AppPerfilRoute
   AppPreciosRoute: typeof AppPreciosRoute
+  AppRecibosRoute: typeof AppRecibosRouteWithChildren
   AppClientesNuevoRoute: typeof AppClientesNuevoRoute
   AppSolicitudesIdRoute: typeof AppSolicitudesIdRoute
   AppSolicitudesNuevaRoute: typeof AppSolicitudesNuevaRoute
@@ -257,6 +434,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppPerfilRoute: AppPerfilRoute,
   AppPreciosRoute: AppPreciosRoute,
+  AppRecibosRoute: AppRecibosRouteWithChildren,
   AppClientesNuevoRoute: AppClientesNuevoRoute,
   AppSolicitudesIdRoute: AppSolicitudesIdRoute,
   AppSolicitudesNuevaRoute: AppSolicitudesNuevaRoute,

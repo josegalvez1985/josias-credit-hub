@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, FileText, FilePlus, Tag, User, Moon, Sun, LogOut } from "lucide-react";
+import { Home, FileText, FilePlus, Receipt, Tag, User, Moon, Sun, LogOut } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ const items = [
   { to: "/dashboard", label: "Inicio", icon: Home },
   { to: "/solicitudes", label: "Solicitudes", icon: FileText },
   { to: "/solicitudes/nueva", label: "Nueva solicitud", icon: FilePlus },
+  { to: "/recibos", label: "Recibos", icon: Receipt },
   { to: "/precios", label: "Precios", icon: Tag },
   { to: "/perfil", label: "Perfil", icon: User },
 ] as const;
@@ -26,7 +27,9 @@ export function AppHeader() {
           Créditos
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
+        {/* A partir de 6 ítems los labels no entran a 768px, por eso el nav
+            horizontal recién aparece en lg; hasta ahí manda la barra inferior. */}
+        <nav className="hidden items-center gap-0.5 lg:flex">
           {items.map((it) => {
             const Icon = it.icon;
             const active = pathname === it.to || (it.to !== "/dashboard" && pathname.startsWith(it.to));
@@ -35,7 +38,7 @@ export function AppHeader() {
                 key={it.to}
                 to={it.to}
                 className={cn(
-                  "flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors",
+                  "flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-sm transition-colors",
                   active
                     ? "bg-secondary/15 text-foreground"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
