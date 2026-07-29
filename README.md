@@ -87,6 +87,7 @@ API ORDS sobre Oracle. Todo el código de base de datos está en [backend/](back
 | `/auth/*` | [backend/auth.sql](backend/auth.sql) | Login y tokens |
 | `/solicitudes/*` | [backend/solicitudes.sql](backend/solicitudes.sql) | Cabecera, detalle, referencias, actividad laboral, LOVs, precios |
 | `/recibos/*` | [backend/recibos.sql](backend/recibos.sql) | Listado, alta, edición, anulación de recibos y sus LOVs |
+| `/consultas/*` | [backend/consultas.sql](backend/consultas.sql) | Ficha de cliente (solo lectura, sin paquete) |
 | `/clientes/*` | — | Todavía no versionado (ver `backend/README.md`) |
 
 El cliente HTTP está en [src/lib/api.ts](src/lib/api.ts).

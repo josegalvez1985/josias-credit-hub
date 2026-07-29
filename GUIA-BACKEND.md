@@ -136,10 +136,18 @@ Detalle completo en [backend/README.md](backend/README.md); estos son los que m�
 | Ubicaciones (pág. 5) | ✅ hecha — [\_app.recibos.ubicaciones.tsx](src/routes/_app.recibos.ubicaciones.tsx) + `GET /recibos/lov/clientes-todos` |
 | Cargar Ubicación (pág. 6) | ✅ hecha — [\_app.recibos.cargar-ubicacion.tsx](src/routes/_app.recibos.cargar-ubicacion.tsx) + `POST /recibos/ubicacion` |
 | Precios de Artículos (pág. 7) | ✅ hecha — comparte [precios-view.tsx](src/components/precios-view.tsx) con `/precios`. **Sin backend nuevo**: ya existía `GET /solicitudes/precios` |
-| Consultar Datos de Clientes (pág. 10) | ✅ hecha — [\_app.recibos.clientes.tsx](src/routes/_app.recibos.clientes.tsx) + `GET /recibos/cliente/:cod_cliente` |
+| Consultar Datos de Clientes (pág. 10) | ✅ hecha — [\_app.recibos.clientes.tsx](src/routes/_app.recibos.clientes.tsx) + `GET /consultas/cliente/:cod_cliente` ([backend/consultas.sql](backend/consultas.sql), módulo aparte) |
 
 **El módulo de Recibos quedó completo**: las 6 secciones del menú de la app APEX
 "Josias Muebles Cobradores" están migradas.
+
+Ojo con una excepción: la ficha de cliente de la pág. 10 **no vive en el módulo
+`recibos`** sino en [backend/consultas.sql](backend/consultas.sql)
+(`GET /consultas/cliente/:cod_cliente`). El handler original estaba en `recibos`
+y desde el navegador daba *"No 'Access-Control-Allow-Origin' header"*; se publicó
+el mismo SELECT en un módulo aparte para no tener que redefinir los otros catorce
+handlers. La sección 3.d de ese archivo tiene los `curl` que confirman si el
+`recibos` viejo quedó dañado — **si es que sí, hay que redesplegarlo entero**.
 
 `CLIENTES.UBICACION` (VARCHAR2 1000) guarda un link
 `https://www.google.com/maps?q=<lat>,<lon>` armado desde el GPS del celular.

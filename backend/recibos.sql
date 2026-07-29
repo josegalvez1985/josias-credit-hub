@@ -1080,9 +1080,18 @@ BEGIN
 
 
   -- ==================================================================
-  -- FICHA DEL CLIENTE   GET /recibos/cliente/:cod_cliente
+  -- FICHA DEL CLIENTE   GET /recibos/cliente/:cod_cliente   [EN DESUSO]
   -- ==================================================================
   -- Página 10 de APEX ("Consulta de Clientes"), proceso GET_DATOS_CLIENTE.
+  --
+  -- OJO: el frontend YA NO LLAMA A ESTE HANDLER. Desde el navegador respondía
+  -- sin cabeceras CORS (o sea: reventaba), así que el mismo SELECT se republicó
+  -- en el módulo `consultas` -> GET /consultas/cliente/:cod_cliente
+  -- (backend/consultas.sql). Se deja acá a propósito, sin tocar, para poder
+  -- comparar los dos con curl y saber si este módulo quedó dañado: el cotejo
+  -- está en la sección 3.d de consultas.sql. Si se confirma que anda bien, se
+  -- puede borrar este bloque; si se confirma que no, hay que redesplegar el
+  -- módulo `recibos` entero.
   --
   -- El original unía CLIENTES con CIUDADES con un INNER JOIN
   -- (`from clientes cl, ciudades ci where ci.cod_ciudad = cl.cod_ciudad`), así

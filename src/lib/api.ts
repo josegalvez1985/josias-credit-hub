@@ -539,8 +539,11 @@ export type FichaCliente = {
   ubicacion?: string;
 };
 
+// Vive en el módulo ORDS `consultas` (backend/consultas.sql), no en `recibos`:
+// el handler viejo `/recibos/cliente/:cod_cliente` respondía sin cabeceras y el
+// navegador lo reportaba como error de CORS. Mismo SELECT, módulo independiente.
 export function fichaCliente(codCliente: number) {
-  return request<FichaCliente>(`/recibos/cliente/${codCliente}`);
+  return request<FichaCliente>(`/consultas/cliente/${codCliente}`);
 }
 
 // Guarda el link de Google Maps del domicilio del cliente (CLIENTES.UBICACION).

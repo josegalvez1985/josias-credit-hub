@@ -16,6 +16,7 @@ Todo lo que necesita ese endpoint está en su archivo, no hay que saltar entre c
 | `auth.sql` | `/auth/login` | `auth_tokens` + `pkg_auth_token` + módulo ORDS `auth` |
 | `solicitudes.sql` | `/solicitudes/*` | `solicitud_ventas_referencias` + `pkg_solicitud_ventas` + módulo ORDS `solicitudes` (cabecera, detalle, referencias, actividad, LOVs, precios) |
 | `recibos.sql` | `/recibos/*` | `pkg_recibos` + módulo ORDS `recibos` (listado, alta, edición, anulación, LOVs) |
+| `consultas.sql` | `/consultas/*` | módulo ORDS `consultas` — ficha de cliente (pág. 10). Sin paquete: es lectura pura. Nació para sacar `cliente/:cod_cliente` fuera de `recibos`, que respondía sin cabeceras CORS |
 
 **Todo lo de un módulo va en su archivo**, incluidos los cambios de esquema.
 No hay carpeta `migrations/`: los `ALTER`/`DROP` van en una sección de saneamiento
@@ -122,9 +123,21 @@ En orden, hasta que uno funcione:
    Repetir unas cuantas veces si hace falta — el lock termina soltándose.
 3. **Borrarlo desde la interfaz**: SQL Developer Web → REST → Modules → módulo →
    *Delete*. ORDS maneja la transacción por dentro.
-4. **Último recurso: renombrar el módulo** (`recibos` → `cobranzas`, con su base
-   path) y ajustar las rutas en `src/lib/api.ts`. La fila trabada queda muerta y se
-   borra otro día. Es feo pero destraba en dos minutos.
+4. **Último recurso: publicar en un módulo nuevo** y ajustar la ruta en
+   `src/lib/api.ts`. La fila trabada queda muerta y se borra otro día. Es feo
+   pero destraba en dos minutos.
+
+   Se puede mover **el módulo entero** (`recibos` → `cobranzas`, con su base
+   path) o **solo el handler que molesta**, que es lo que suele convenir: mover
+   uno no obliga a redefinir los otros catorce, y si el diagnóstico estaba
+   equivocado no rompiste nada. Ejemplo real: `consultas.sql` nació así, sacando
+   `cliente/:cod_cliente` de `recibos` cuando el navegador lo reportaba como
+   error de CORS (2026-07-29).
+
+   > Un módulo nuevo **no arregla lo que no era Oracle**. Si el 500 venía del
+   > SELECT o de los permisos, el módulo nuevo falla igual — por eso conviene
+   > dejar los dos publicados un rato y compararlos con `curl` contra el mismo
+   > dato. Ver la sección 3.d de `consultas.sql`, que es exactamente ese cotejo.
 
 ## Convenciones
 
@@ -163,11 +176,13 @@ En orden, hasta que uno funcione:
 
 ## Cómo agregar un campo nuevo (checklist)
 
-Ejemplo real: `IND_GARANTE` en referencias (`migrations/2026-07-24_referencias_ind_garante.sql`).
+Ejemplo real: `IND_GARANTE` en las referencias de una solicitud.
 
-1. **Migración**: `ALTER TABLE ... ADD` en un archivo nuevo de `migrations/`, y
-   actualizar también el `CREATE TABLE` de la sección 1 del endpoint para que una
-   base nueva quede igual.
+1. **Esquema**: el `ALTER TABLE ... ADD` va **comentado en la sección 1** del
+   archivo del módulo, con su rollback, y se aplica a mano contra producción.
+   Actualizar también el `CREATE TABLE` de esa misma sección, para que una base
+   nueva quede igual. **No hay carpeta `migrations/`**: todo lo del módulo vive
+   en su archivo (ver `recibos.sql` §1).
 2. **Paquete** (sección 2): agregar el parámetro a la spec y al body (`INSERT` y
    `UPDATE`). Ponerle `DEFAULT` para no romper llamadas que todavía no mandan el
    campo. Si la columna tiene `NOT NULL` o un `CHECK`, normalizar el valor en el

@@ -32,6 +32,7 @@ o un listado, releer esta tabla.** El síntoma casi nunca apunta a la causa.
 | --- | --- | --- |
 | El buscador de un LOV no filtra nada | **`q` es un parámetro reservado de ORDS** (filtro JSON `?q={...}`). Un bind `:q` nunca recibe el valor | Los LOV **no filtran en Oracle**: devuelven todo y el cliente busca con `filtrarLov()` de `src/lib/api.ts` |
 | *"No 'Access-Control-Allow-Origin' header"* | **Es un 500 disfrazado.** ORDS no manda cabeceras CORS cuando el handler explota. Ningún módulo define `origins_allowed` y todos funcionan | Diagnosticar con `curl -i`, nunca desde el navegador |
+| Un handler suelto responde sin cabeceras y el módulo no se puede redesplegar | El módulo quedó **trabado o a medias** de un `DEFINE_MODULE` fallido | Publicar **solo ese handler en un módulo nuevo** (`backend/<modulo>.sql`) y apuntar la ruta en `api.ts`. No hace falta redefinir los otros handlers. Ejemplo: `consultas.sql` |
 | `ORA-00001` sobre `ORDS_MODULES_UNIQUE1` | **`ORDS.DEFINE_MODULE` no es idempotente** | La sección 3 borra el módulo primero. Ver `backend/README.md` → *Desplegar un módulo ORDS* |
 | `ORA-00060` al desplegar, ~12 s de espera | **Se corrió el `.sql` entero de una vez.** Pasa siempre | Tres ejecuciones separadas: paquete → `DELETE_MODULE` solo (verificar conteo 0) → `DEFINE_MODULE`. Ver `backend/README.md` |
 | Un `DELETE_MODULE` "funciona" pero no borra | Un `EXCEPTION WHEN OTHERS THEN NULL` se tragó el error | **Nunca tapar errores.** Preguntar si existe, no atrapar excepciones |
