@@ -1,13 +1,17 @@
 import { useState } from "react";
-import { Printer, Copy, MessageCircle, Loader2, Send } from "lucide-react";
+import { Printer, Copy, MessageCircle, Loader2, Send, Check } from "lucide-react";
 import { imprimirRecibo, soportaImpresion, type DatosTicket } from "@/lib/escpos";
 import type { ReciboDetalle } from "@/lib/api";
 import {
-  enviarReciboPorWhatsApp,
-  enviarSoloTexto,
+  abrirWhatsApp,
+  copiarImagen,
+  descargarImagen,
+  dibujarRecibo,
   normalizarTelefono,
+  soportaCopiarImagen,
   telefonoValido,
 } from "@/lib/recibo-whatsapp";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -120,6 +124,9 @@ export function ReciboAcciones({
   );
 }
 
+// Réplica del modal jmAbrirModalRecibo de la página 3: mismo flujo (dibujar →
+// copiar al portapapeles → abrir WhatsApp), misma barra de progreso con sus
+// textos, mismo aviso de "pegá con Ctrl+V" y mismos botones.
 function WhatsAppDialog({
   abierto,
   onClose,
@@ -131,36 +138,95 @@ function WhatsAppDialog({
   datos: DatosTicket;
   telefono?: string | null;
 }) {
-  // El teléfono viene de la ficha del cliente, ya normalizado. En APEX esto lo
+  // El teléfono viene de la ficha del cliente, ya normalizado. En APEX lo
   // resolvía un proceso Ajax (GET_TELEFONO_CLIENTE); acá viaja con el recibo.
   const [numero, setNumero] = useState(() => normalizarTelefono(telefono));
-  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState(false);
+  const [trabajando, setTrabajando] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+  const [progreso, setProgreso] = useState<{ pct: number; texto: string } | null>(null);
+  const [aviso, setAviso] = useState<{ titulo: string; cuerpo: string } | null>(null);
 
-  async function enviarConImagen() {
-    if (!telefonoValido(numero)) return toast.error("Ingresá un número válido (mínimo 8 dígitos)");
-    setEnviando(true);
-    try {
-      const r = await enviarReciboPorWhatsApp(datos, numero);
-      if (r === "compartido") toast.success("Recibo compartido");
-      else if (r === "portapapeles") toast.success("Imagen copiada. Pegala en el chat con Ctrl+V.");
-      else toast.success("Imagen descargada. Adjuntala en el chat.");
-      onClose();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error al enviar";
-      if (!/abort|cancel/i.test(msg)) toast.error(msg);
-    } finally {
-      setEnviando(false);
-    }
+  function reiniciar() {
+    setError(false);
+    setTrabajando(false);
+    setCopiado(false);
+    setProgreso(null);
+    setAviso(null);
   }
 
-  function enviarTexto() {
-    if (!telefonoValido(numero)) return toast.error("Ingresá un número válido (mínimo 8 dígitos)");
-    enviarSoloTexto(datos, numero);
+  function validar(): boolean {
+    if (!telefonoValido(numero)) {
+      setError(true);
+      return false;
+    }
+    setError(false);
+    return true;
+  }
+
+  async function copiarYAbrir() {
+    if (!validar() || trabajando) return;
+    setTrabajando(true);
+    setAviso(null);
+
+    setProgreso({ pct: 20, texto: "Dibujando recibo…" });
+    // Un respiro para que el navegador pinte el 20% antes de bloquear con el canvas.
+    await new Promise((r) => setTimeout(r, 80));
+
+    const canvas = dibujarRecibo(datos);
+    setProgreso({ pct: 55, texto: "Generando imagen…" });
+
+    if (!soportaCopiarImagen()) {
+      setProgreso({ pct: 100, texto: "⚠ Descargando imagen PNG (navegador sin soporte de copiar)…" });
+      descargarImagen(canvas, datos.nroRecibo);
+      setAviso({ titulo: "Imagen descargada", cuerpo: "Adjuntala manualmente en WhatsApp." });
+      setTrabajando(false);
+      return;
+    }
+
+    setProgreso({ pct: 75, texto: "Copiando al portapapeles…" });
+    try {
+      await copiarImagen(canvas);
+    } catch (e) {
+      setProgreso({
+        pct: 100,
+        texto: "⚠ Error al copiar: " + (e instanceof Error ? e.message : "desconocido"),
+      });
+      setTrabajando(false);
+      return;
+    }
+
+    setCopiado(true);
+    setAviso({
+      titulo: "Imagen copiada al portapapeles",
+      cuerpo:
+        "Abrí el chat en WhatsApp y pegala: en la computadora con Ctrl+V, en el celular tocá el campo de texto → Pegar.",
+    });
+    setProgreso({ pct: 90, texto: "Abriendo WhatsApp…" });
+
+    setTimeout(() => {
+      setProgreso({ pct: 100, texto: "✅ Listo — pegá la imagen en el chat" });
+      abrirWhatsApp(datos, numero);
+      setTrabajando(false);
+    }, 350);
+  }
+
+  function soloTexto() {
+    if (!validar()) return;
+    abrirWhatsApp(datos, numero);
     onClose();
   }
 
   return (
-    <Dialog open={abierto} onOpenChange={(o) => !o && onClose()}>
+    <Dialog
+      open={abierto}
+      onOpenChange={(o) => {
+        if (!o) {
+          reiniciar();
+          onClose();
+        }
+      }}
+    >
       <DialogContent aria-describedby={undefined} className="sm:max-w-sm">
         <DialogHeader className="text-left">
           <DialogTitle className="font-display text-lg">Enviar recibo por WhatsApp</DialogTitle>
@@ -169,12 +235,14 @@ function WhatsAppDialog({
         <div className="space-y-4">
           <div className="rounded-xl bg-muted px-4 py-3 text-xs text-muted-foreground">
             Recibo <span className="font-medium text-foreground">N° {datos.nroRecibo}</span> ·{" "}
-            {datos.fecha} · CI {datos.documento} · Gs. {datos.monto}
+            {datos.fecha}
+            <br />
+            CI {datos.documento} · Gs. {datos.monto}
           </div>
 
           <div className="space-y-1.5">
-            <Label>Número de WhatsApp</Label>
-            <div className="flex items-center gap-0 overflow-hidden rounded-md border border-input focus-within:border-ring">
+            <Label>Número de WhatsApp destino</Label>
+            <div className="flex items-center overflow-hidden rounded-md border border-input focus-within:border-ring">
               <span className="shrink-0 border-r border-input bg-muted px-3 py-2 text-sm font-medium">
                 🇵🇾 +595
               </span>
@@ -183,33 +251,93 @@ function WhatsAppDialog({
                 inputMode="numeric"
                 autoFocus
                 value={numero}
-                onChange={(e) => setNumero(e.target.value.replace(/\D/g, ""))}
-                onKeyDown={(e) => e.key === "Enter" && enviarConImagen()}
+                onChange={(e) => {
+                  setNumero(e.target.value.replace(/\D/g, ""));
+                  setError(false);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && copiarYAbrir()}
                 placeholder="981123456"
                 maxLength={12}
                 className="border-0 font-mono focus-visible:ring-0"
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              {telefono
-                ? "Cargado desde la ficha del cliente. Podés cambiarlo."
-                : "El cliente no tiene teléfono cargado."}
-            </p>
+
+            {error ? (
+              <p className="text-xs text-destructive">
+                ⚠ Ingresá un número válido (mínimo 8 dígitos)
+              </p>
+            ) : telefono ? (
+              <p className="text-xs text-success">✅ Teléfono cargado desde la ficha del cliente</p>
+            ) : (
+              <p className="text-xs text-warning-foreground">
+                ⚠ No se encontró teléfono — ingresalo manualmente
+              </p>
+            )}
           </div>
+
+          {progreso && (
+            <div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-success transition-all duration-500"
+                  style={{ width: `${progreso.pct}%` }}
+                />
+              </div>
+              <p className="mt-1.5 text-center text-xs text-muted-foreground">{progreso.texto}</p>
+            </div>
+          )}
+
+          {aviso && (
+            <div className="rounded-xl border border-success/40 bg-success/10 p-3 text-xs leading-relaxed">
+              <strong className="mb-0.5 block text-sm">📋 {aviso.titulo}</strong>
+              {aviso.cuerpo}
+            </div>
+          )}
 
           <div className="space-y-2">
             <Button
               type="button"
-              onClick={enviarConImagen}
-              disabled={enviando}
-              className="w-full bg-[#25D366] text-white hover:opacity-90"
+              onClick={copiarYAbrir}
+              disabled={trabajando || copiado}
+              className={cn(
+                "w-full",
+                copiado
+                  ? "bg-success text-success-foreground"
+                  : "bg-primary text-primary-foreground hover:opacity-90",
+              )}
             >
-              {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Enviar recibo con imagen
+              {trabajando ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : copiado ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+              {copiado ? "¡Imagen copiada! Pegala en el chat" : "Copiar imagen y abrir WhatsApp"}
             </Button>
-            <Button type="button" variant="outline" onClick={enviarTexto} className="w-full">
-              Solo texto
-            </Button>
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  reiniciar();
+                  onClose();
+                }}
+                disabled={trabajando}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={soloTexto}
+                disabled={trabajando}
+                className="flex-[2] bg-[#25D366] text-white hover:opacity-90"
+              >
+                <Send className="h-4 w-4" /> Solo texto
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

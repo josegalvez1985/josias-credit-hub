@@ -454,6 +454,9 @@ export function anularRecibo(pk: ReciboPk, anulado: "S" | "N" = "S") {
 // LOVs en cascada del alta: cliente -> solicitud -> cuota.
 export const lovRecibos = {
   clientes: buscarClientesRecibos,
+  // Todos los clientes, sin filtro de deuda. Es el LOV de ubicaciones (pág. 5).
+  clientesTodos: (q?: string) =>
+    todosLosClientes("/recibos/lov/clientes-todos").then((all) => filtrarLov(all, q)),
   solicitudes: (codCliente: number) =>
     request<OrdsFeed<LovItem & { nro_solicitud: number; saldo_total: number }>>(
       `/recibos/lov/solicitudes/${codCliente}?limit=500`,
@@ -471,6 +474,7 @@ export type ClienteRecibosLov = LovItem & {
   ruc?: string;
   nro_telefono?: string;
   nombre_fantasia?: string;
+  ubicacion?: string; // solo lo trae lov/clientes-todos
 };
 
 // Filtra un LOV por cualquiera de sus campos, sin distinguir mayúsculas.
@@ -495,13 +499,13 @@ export function filtrarLov<T extends LovItem>(items: T[], q?: string): T[] {
   });
 }
 
-// Trae todos los clientes con cuotas pendientes, recorriendo las páginas de ORDS.
-async function todosClientesRecibos(): Promise<ClienteRecibosLov[]> {
+// Recorre las páginas de ORDS de un LOV de clientes y devuelve la lista entera.
+async function todosLosClientes(path: string): Promise<ClienteRecibosLov[]> {
   const out: ClienteRecibosLov[] = [];
   let offset = 0;
   for (;;) {
     const f = await request<OrdsFeed<ClienteRecibosLov> & { hasMore?: boolean }>(
-      `/recibos/lov/clientes?limit=500&offset=${offset}`,
+      `${path}?limit=500&offset=${offset}`,
     );
     const items = f.items ?? [];
     out.push(...items);
@@ -512,7 +516,7 @@ async function todosClientesRecibos(): Promise<ClienteRecibosLov[]> {
 }
 
 async function buscarClientesRecibos(q?: string): Promise<ClienteRecibosLov[]> {
-  return filtrarLov(await todosClientesRecibos(), q);
+  return filtrarLov(await todosLosClientes("/recibos/lov/clientes"), q);
 }
 
 export type CuotaLov = LovItem & {
@@ -522,6 +526,30 @@ export type CuotaLov = LovItem & {
   fec_vencimiento?: string;
   fec_derivacion?: string;
 };
+
+// Ficha del cliente para la pantalla de consulta (página 10 de APEX).
+export type FichaCliente = {
+  cod_cliente: number;
+  razon_social?: string;
+  documento?: string;
+  nro_telefono?: string;
+  ciudad?: string;
+  direccion?: string;
+  nro_casa?: number;
+  ubicacion?: string;
+};
+
+export function fichaCliente(codCliente: number) {
+  return request<FichaCliente>(`/recibos/cliente/${codCliente}`);
+}
+
+// Guarda el link de Google Maps del domicilio del cliente (CLIENTES.UBICACION).
+export function guardarUbicacion(codCliente: number, ubicacion: string) {
+  return request("/recibos/ubicacion", {
+    method: "POST",
+    body: JSON.stringify({ cod_cliente: codCliente, ubicacion }),
+  });
+}
 
 // Marca la fecha en que la cuota pasó a gestión de cobranza (VENTAS_CUOTAS.FEC_DERIVACION).
 export function derivarCuota(idSolicitud: number, idCuota: number, fechaDerivacion: string) {

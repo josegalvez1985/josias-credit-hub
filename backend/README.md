@@ -50,8 +50,19 @@ Conectado como `WKSP_JOSIASMUEBLES`, en SQL Developer / SQLcl:
 
 ### Desplegar un módulo ORDS
 
+> **Nunca correr el `.sql` entero de una sola vez.** Hacerlo da `ORA-00060` de
+> forma reproducible. Van **tres ejecuciones separadas**: (1) la sección 2, el
+> paquete · (2) el `ORDS.DELETE_MODULE` **solo**, y verificar que el conteo dé 0
+> · (3) la sección 3, el `DECLARE … END;` que define el módulo.
+>
+> El síntoma de que se hizo mal: el paso del borrado tarda ~12 segundos (está
+> esperando el lock, no trabajando) y después el `DEFINE_MODULE` falla con
+> `ORA-00001`.
+
 `ORDS.DEFINE_MODULE` **no es idempotente**: si el módulo ya existe falla con
-`ORA-00001` sobre `ORDS_MODULES_UNIQUE1`. Por eso la sección 3 arranca borrando.
+`ORA-00001` sobre `ORDS_MODULES_UNIQUE1`. Por eso la sección 3 arranca borrando
+—útil en una base limpia—, pero sobre un módulo ya existente hay que hacer ese
+borrado a mano y por separado.
 
 ```sql
 DECLARE

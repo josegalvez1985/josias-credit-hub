@@ -12,12 +12,19 @@ export function ClienteCombobox({
   value,
   label,
   onSelect,
+  fuente = "con-deuda",
 }: {
   value: number | null;
   label: string | null;
   onSelect: (item: ClienteRecibosLov) => void;
+  // "con-deuda" (páginas 3 y 4) lista solo clientes con cuotas pendientes.
+  // "todos" (página 5, ubicaciones) los lista a todos y trae `ubicacion`.
+  fuente?: "con-deuda" | "todos";
 }) {
-  const fetcher = useCallback((q?: string) => lovRecibos.clientes(q), []);
+  const fetcher = useCallback(
+    (q?: string) => (fuente === "todos" ? lovRecibos.clientesTodos(q) : lovRecibos.clientes(q)),
+    [fuente],
+  );
 
   return (
     <AsyncCombobox

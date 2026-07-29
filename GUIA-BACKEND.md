@@ -133,7 +133,18 @@ Detalle completo en [backend/README.md](backend/README.md); estos son los que m�
 | Impresión térmica | ✅ hecha — [src/lib/escpos.ts](src/lib/escpos.ts), Web Bluetooth sin dependencias |
 | Envío por WhatsApp | ✅ hecho — [src/lib/recibo-whatsapp.ts](src/lib/recibo-whatsapp.ts), imagen PNG + texto |
 | Derivaciones (pág. 4) | ✅ hecha — [\_app.recibos.derivaciones.tsx](src/routes/_app.recibos.derivaciones.tsx) + `POST /recibos/derivar` |
-| Ubicaciones, Cargar Ubicación, Precios de Artículos, Datos de Clientes | ❌ pendientes — rutas creadas con placeholder, falta el export de APEX |
+| Ubicaciones (pág. 5) | ✅ hecha — [\_app.recibos.ubicaciones.tsx](src/routes/_app.recibos.ubicaciones.tsx) + `GET /recibos/lov/clientes-todos` |
+| Cargar Ubicación (pág. 6) | ✅ hecha — [\_app.recibos.cargar-ubicacion.tsx](src/routes/_app.recibos.cargar-ubicacion.tsx) + `POST /recibos/ubicacion` |
+| Precios de Artículos (pág. 7) | ✅ hecha — comparte [precios-view.tsx](src/components/precios-view.tsx) con `/precios`. **Sin backend nuevo**: ya existía `GET /solicitudes/precios` |
+| Consultar Datos de Clientes (pág. 10) | ✅ hecha — [\_app.recibos.clientes.tsx](src/routes/_app.recibos.clientes.tsx) + `GET /recibos/cliente/:cod_cliente` |
+
+**El módulo de Recibos quedó completo**: las 6 secciones del menú de la app APEX
+"Josias Muebles Cobradores" están migradas.
+
+`CLIENTES.UBICACION` (VARCHAR2 1000) guarda un link
+`https://www.google.com/maps?q=<lat>,<lon>` armado desde el GPS del celular.
+La geolocalización, igual que Web Bluetooth, **exige contexto seguro**: funciona
+en HTTPS o `localhost`, no en `http://<ip-de-la-lan>:8080`.
 
 `V_SALDOS` y las funciones `RETORNA_ARTICULOS`, `FN_CUOTAS`, `FN_USUARIO` y
 `NUM_LETRAS` **existen y tienen la forma esperada**: quedó confirmado cuando

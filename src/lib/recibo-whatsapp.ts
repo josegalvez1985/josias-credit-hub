@@ -1,12 +1,9 @@
 // Envío del recibo por WhatsApp: imagen PNG + mensaje de texto.
 //
-// Portado de las funciones jm* de la página 3 de APEX. Se mantiene el mismo
-// diseño de imagen y el mismo texto, porque es el comprobante que los clientes
-// ya reciben hoy.
-//
-// La diferencia con APEX: allá el único camino era copiar la imagen al
-// portapapeles y pedirle al usuario que hiciera Ctrl+V en WhatsApp Web. Acá se
-// intenta primero la Web Share API, que en Android adjunta la imagen sola.
+// Portado de las funciones jm* de la página 3 de APEX: mismo diseño de imagen,
+// mismo texto y **mismo flujo** — se dibuja el recibo en un canvas, se copia el
+// PNG al portapapeles y se abre WhatsApp para que el usuario lo pegue.
+// Si el navegador no soporta copiar imágenes, se descarga el archivo.
 
 import type { DatosTicket } from "./escpos";
 
@@ -247,53 +244,22 @@ function aBlob(c: HTMLCanvasElement): Promise<Blob> {
 // ---------------------------------------------------------------------
 // Envío
 // ---------------------------------------------------------------------
-export type ResultadoEnvio = "compartido" | "portapapeles" | "descargado";
-
-type NavegadorConShare = Navigator & {
-  share?: (data: { files?: File[]; text?: string; title?: string }) => Promise<void>;
-  canShare?: (data: { files?: File[] }) => boolean;
-};
-
-// Devuelve cómo terminó, para poder explicarle al usuario qué hacer después.
-//
-//  - "compartido"    -> Web Share API: Android adjunta la imagen solo. Es el
-//                       camino bueno y el que no existía en APEX.
-//  - "portapapeles"  -> el camino de APEX: se copia el PNG y se abre WhatsApp
-//                       para que el usuario pegue con Ctrl+V.
-//  - "descargado"    -> ni share ni clipboard; queda el archivo para adjuntar.
-export async function enviarReciboPorWhatsApp(
-  d: DatosTicket,
-  telefono: string,
-): Promise<ResultadoEnvio> {
-  const canvas = dibujarRecibo(d);
-  const blob = await aBlob(canvas);
-  const archivo = new File([blob], `Recibo_${d.nroRecibo}.png`, { type: "image/png" });
-  const texto = mensajeWhatsApp(d);
-  const nav = navigator as NavegadorConShare;
-
-  if (nav.share && nav.canShare?.({ files: [archivo] })) {
-    await nav.share({ files: [archivo], text: texto, title: `Recibo ${d.nroRecibo}` });
-    return "compartido";
-  }
-
-  if (navigator.clipboard && "write" in navigator.clipboard) {
-    try {
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      window.open(urlWhatsApp(telefono, texto), "_blank");
-      return "portapapeles";
-    } catch {
-      /* algunos navegadores lo bloquean fuera de un gesto directo */
-    }
-  }
-
-  const a = document.createElement("a");
-  a.href = canvas.toDataURL("image/png");
-  a.download = `Recibo_${d.nroRecibo}.png`;
-  a.click();
-  window.open(urlWhatsApp(telefono, texto), "_blank");
-  return "descargado";
+export function soportaCopiarImagen(): boolean {
+  return Boolean(navigator.clipboard && "write" in navigator.clipboard);
 }
 
-export function enviarSoloTexto(d: DatosTicket, telefono: string) {
+export async function copiarImagen(canvas: HTMLCanvasElement): Promise<void> {
+  const blob = await aBlob(canvas);
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+}
+
+export function descargarImagen(canvas: HTMLCanvasElement, nroRecibo: number | string) {
+  const a = document.createElement("a");
+  a.href = canvas.toDataURL("image/png");
+  a.download = `Recibo_${nroRecibo}.png`;
+  a.click();
+}
+
+export function abrirWhatsApp(d: DatosTicket, telefono: string) {
   window.open(urlWhatsApp(telefono, mensajeWhatsApp(d)), "_blank");
 }

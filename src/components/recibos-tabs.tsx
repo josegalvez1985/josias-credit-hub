@@ -3,49 +3,57 @@ import { Receipt, Share2, MapPin, MapPinPlus, Tag, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Las secciones del menú de la app APEX "Josias Muebles Cobradores" (266784),
-// en el mismo orden. Las que todavía no se migraron muestran una pantalla vacía.
+// en el mismo orden. `corta` es la etiqueta que se muestra cuando la sección
+// está activa: el nombre completo no entra en la píldora en un celular.
 export const SECCIONES = [
-  { to: "/recibos", label: "Recibos", icon: Receipt },
-  { to: "/recibos/derivaciones", label: "Derivaciones", icon: Share2 },
-  { to: "/recibos/ubicaciones", label: "Ubicaciones", icon: MapPin },
-  { to: "/recibos/cargar-ubicacion", label: "Cargar Ubicación", icon: MapPinPlus },
-  { to: "/recibos/precios-articulos", label: "Precios de Artículos", icon: Tag },
-  { to: "/recibos/clientes", label: "Consultar Datos de Clientes", icon: Users },
+  { to: "/recibos", label: "Recibos", corta: "Recibos", icon: Receipt },
+  { to: "/recibos/derivaciones", label: "Derivaciones", corta: "Derivac.", icon: Share2 },
+  { to: "/recibos/ubicaciones", label: "Ubicaciones", corta: "Ubicac.", icon: MapPin },
+  { to: "/recibos/cargar-ubicacion", label: "Cargar Ubicación", corta: "Cargar", icon: MapPinPlus },
+  { to: "/recibos/precios-articulos", label: "Precios de Artículos", corta: "Precios", icon: Tag },
+  { to: "/recibos/clientes", label: "Consultar Datos de Clientes", corta: "Clientes", icon: Users },
 ] as const;
 
+// Barra de secciones al estilo Material 3: las seis entran sin scrollear porque
+// solo la activa muestra su texto; las demás quedan como icono y se expanden al
+// tocarlas. Antes scrolleaba de costado y escondía la mitad de las opciones.
 export function RecibosTabs() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
-    // En el celular no entran seis pestañas: scrollean de costado, con los bordes
-    // difuminados para que se note que hay más. El overflow-hidden del <nav>
-    // evita que el bleed negativo empuje el ancho de la página.
-    <nav className="relative -mx-4 overflow-hidden sm:-mx-6">
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-4 bg-gradient-to-r from-background to-transparent sm:w-6" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-4 bg-gradient-to-l from-background to-transparent sm:w-6" />
-
-      <ul className="flex gap-1 overflow-x-auto px-4 pb-2 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <nav aria-label="Secciones de cobranzas">
+      {/* Medidas ajustadas para que a 360 px la píldora activa tenga ~70 px de
+          texto: 5 iconos de 40 px + gaps de 2 px. Desde sm todo respira más. */}
+      <ul className="flex items-center gap-0.5 rounded-full bg-muted/60 p-1 sm:gap-1">
         {SECCIONES.map((s) => {
           const Icon = s.icon;
           const active = pathname === s.to || pathname.endsWith(s.to);
           return (
-            <li key={s.to} className="shrink-0">
+            <li key={s.to} className={cn("min-w-0", active ? "flex-1" : "shrink-0")}>
               <Link
                 to={s.to}
+                aria-label={s.label}
+                aria-current={active ? "page" : undefined}
+                title={s.label}
                 className={cn(
-                  "flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm transition-colors",
+                  "flex h-10 items-center justify-center gap-1.5 rounded-full transition-all duration-200 sm:h-11",
                   active
-                    ? "border-primary bg-primary/10 font-medium text-foreground"
-                    : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+                    ? "bg-card px-2.5 font-medium text-foreground shadow-soft sm:px-4"
+                    : "w-10 text-muted-foreground hover:bg-card/60 hover:text-foreground active:scale-95 sm:w-11",
                 )}
               >
-                <Icon className="h-4 w-4 shrink-0" />
-                {s.label}
+                <Icon className="h-4 w-4 shrink-0 sm:h-[18px] sm:w-[18px]" strokeWidth={active ? 2.4 : 1.8} />
+                {active && <span className="truncate text-xs sm:text-sm">{s.corta}</span>}
               </Link>
             </li>
           );
         })}
       </ul>
+
+      {/* El nombre completo de la sección, que en la píldora no entra. */}
+      <p className="mt-2 px-1 text-xs text-muted-foreground">
+        {SECCIONES.find((s) => pathname === s.to || pathname.endsWith(s.to))?.label}
+      </p>
     </nav>
   );
 }

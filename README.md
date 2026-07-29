@@ -13,7 +13,7 @@ Antes de tocar código, leer la guía que corresponda:
 
 | Archivo | Para qué |
 | --- | --- |
-| [CLAUDE.md](CLAUDE.md) | Resumen del proyecto y las reglas que más se olvidan |
+| [CLAUDE.md](CLAUDE.md) | Resumen del proyecto + **tabla de errores ya cometidos**. Leer esta primero |
 | [GUIA-FRONTEND.md](GUIA-FRONTEND.md) | Sistema de diseño, arquetipos de página, equivalencias APEX → React |
 | [GUIA-BACKEND.md](GUIA-BACKEND.md) | Cómo se traduce el PL/SQL de APEX a ORDS y qué información pedir |
 | [backend/README.md](backend/README.md) | Convenciones de ORDS/Oracle, despliegue de módulos y errores frecuentes |

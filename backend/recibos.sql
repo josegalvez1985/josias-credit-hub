@@ -10,14 +10,39 @@
 --   4. VERIFICACIÓN             -> consultas sueltas, no se corren en el deploy.
 --
 -- =====================================================================
--- CÓMO DESPLEGAR
+-- CÓMO DESPLEGAR  —  EN TRES EJECUCIONES SEPARADAS
 -- =====================================================================
--- La sección 1 va comentada, así que correr el archivo entero es seguro:
+-- NO correr el archivo entero de una. Correrlo todo junto da ORA-00060 de
+-- forma reproducible: el bloque que borra el módulo queda esperando un lock
+-- sobre ORDS_METADATA.ORDS_MODULES y termina en interbloqueo, y después el
+-- DEFINE_MODULE choca con ORA-00001 porque el módulo sigue ahí.
 --
---   @recibos.sql
+-- La secuencia que SÍ funciona, ejecutando cada paso por separado y esperando
+-- a que termine antes del siguiente:
 --
--- Si el paquete ya está creado y solo cambiaron los endpoints, alcanza con
--- correr la sección 3.
+--   PASO 1 — Sección 2 completa (el paquete).
+--            Marcar desde "CREATE OR REPLACE PACKAGE pkg_recibos" hasta el
+--            "END pkg_recibos; /" del body, y ejecutar.
+--
+--   PASO 2 — Solo esto, nada más seleccionado:
+--
+--              BEGIN
+--                ORDS.DELETE_MODULE(p_module_name => 'recibos');
+--                COMMIT;
+--              END;
+--              /
+--
+--            Tiene que tardar milisegundos. Si tarda ~12 segundos, es que está
+--            esperando el lock: ver más abajo cómo destrabarlo.
+--            Verificar antes de seguir:
+--              SELECT COUNT(*) FROM user_ords_modules WHERE name = 'recibos';  -- 0
+--
+--   PASO 3 — Sección 3 completa (el bloque DECLARE ... END; / que define
+--            el módulo y sus handlers).
+--
+-- El bloque de borrado que está al principio de la sección 3 sirve para la
+-- primera instalación en una base limpia. En una base donde el módulo ya
+-- existe, hacer el PASO 2 a mano igual.
 --
 -- ---------------------------------------------------------------------
 -- SI FALLA CON ORA-00060 / ORA-00001 (ORDS_MODULES_UNIQUE1)
@@ -291,6 +316,14 @@ CREATE OR REPLACE PACKAGE pkg_recibos AS
     p_fecha_derivacion DATE
   );
 
+  -- Guarda el link de Google Maps del domicilio del cliente.
+  -- Es el proceso "Guardar" de la página 6 de APEX: un UPDATE de CLIENTES.UBICACION
+  -- con la URL que arma el botón "Obtener Ubicación" a partir del GPS del celular.
+  PROCEDURE guardar_ubicacion(
+    p_cod_cliente NUMBER,
+    p_ubicacion   VARCHAR2
+  );
+
 END pkg_recibos;
 /
 
@@ -542,6 +575,41 @@ CREATE OR REPLACE PACKAGE BODY pkg_recibos AS
       ROLLBACK;
       RAISE;
   END derivar;
+
+
+  PROCEDURE guardar_ubicacion(
+    p_cod_cliente NUMBER,
+    p_ubicacion   VARCHAR2
+  ) IS
+  BEGIN
+    IF p_cod_cliente IS NULL THEN
+      RAISE_APPLICATION_ERROR(-20230, 'Falta el cliente');
+    END IF;
+
+    IF TRIM(p_ubicacion) IS NULL THEN
+      RAISE_APPLICATION_ERROR(-20231, 'Falta la ubicación');
+    END IF;
+
+    -- La columna es VARCHAR2(1000); si llega algo más largo, avisar con un
+    -- mensaje entendible en vez del ORA-12899 crudo.
+    IF LENGTH(p_ubicacion) > 1000 THEN
+      RAISE_APPLICATION_ERROR(-20232, 'La ubicación supera los 1000 caracteres');
+    END IF;
+
+    UPDATE clientes
+       SET ubicacion   = TRIM(p_ubicacion)
+     WHERE cod_cliente = p_cod_cliente;
+
+    IF SQL%ROWCOUNT = 0 THEN
+      RAISE_APPLICATION_ERROR(-20233, 'El cliente no existe');
+    END IF;
+
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+      ROLLBACK;
+      RAISE;
+  END guardar_ubicacion;
 
 END pkg_recibos;
 /
@@ -1012,6 +1080,94 @@ BEGIN
 
 
   -- ==================================================================
+  -- FICHA DEL CLIENTE   GET /recibos/cliente/:cod_cliente
+  -- ==================================================================
+  -- Página 10 de APEX ("Consulta de Clientes"), proceso GET_DATOS_CLIENTE.
+  --
+  -- El original unía CLIENTES con CIUDADES con un INNER JOIN
+  -- (`from clientes cl, ciudades ci where ci.cod_ciudad = cl.cod_ciudad`), así
+  -- que un cliente sin ciudad cargada NO devolvía filas y la pantalla decía
+  -- "Cliente no encontrado o sin datos" aunque el cliente existiera. Acá va
+  -- LEFT JOIN: la ciudad viene NULL y el resto de los datos se muestra igual.
+  ORDS.DEFINE_TEMPLATE(
+      p_module_name    => 'recibos',
+      p_pattern        => 'cliente/:cod_cliente',
+      p_priority       => 0,
+      p_etag_type      => 'HASH',
+      p_etag_query     => NULL,
+      p_comments       => NULL);
+
+  ORDS.DEFINE_HANDLER(
+      p_module_name    => 'recibos',
+      p_pattern        => 'cliente/:cod_cliente',
+      p_method         => 'GET',
+      p_source_type    => 'json/query;type=single',
+      p_mimes_allowed  => NULL,
+      p_comments       => NULL,
+      p_source         =>
+'      SELECT cl.cod_cliente,
+             cl.razon_social,
+             NVL(cl.ci, cl.ruc)  AS documento,
+             cl.nro_telefono,
+             ci.descripcion      AS ciudad,
+             cl.direccion,
+             cl.nro_casa,
+             cl.ubicacion
+      FROM   clientes cl
+      LEFT JOIN ciudades ci ON ci.cod_ciudad = cl.cod_ciudad
+      WHERE  cl.cod_cliente = :cod_cliente
+    ');
+
+
+  -- ==================================================================
+  -- UBICACIÓN   POST /recibos/ubicacion
+  -- ==================================================================
+  -- Página 6 de APEX ("Cargar Ubicación"): guarda CLIENTES.UBICACION.
+  ORDS.DEFINE_TEMPLATE(
+      p_module_name    => 'recibos',
+      p_pattern        => 'ubicacion',
+      p_priority       => 0,
+      p_etag_type      => 'HASH',
+      p_etag_query     => NULL,
+      p_comments       => NULL);
+
+  ORDS.DEFINE_HANDLER(
+      p_module_name    => 'recibos',
+      p_pattern        => 'ubicacion',
+      p_method         => 'POST',
+      p_source_type    => 'plsql/block',
+      p_mimes_allowed  => NULL,
+      p_comments       => NULL,
+      p_source         =>
+'
+      DECLARE
+        l_user VARCHAR2(255);
+      BEGIN
+        l_user := pkg_auth_token.validar_token(REPLACE(:authorization, ''Bearer '', ''''));
+        IF l_user IS NULL THEN
+          :status_code := 401;
+          htp.p(''{"success": false, "message": "Token invalido o expirado"}'');
+          RETURN;
+        END IF;
+
+        pkg_recibos.guardar_ubicacion(
+          p_cod_cliente => :cod_cliente,
+          p_ubicacion   => :ubicacion);
+
+        :status_code := 200;
+        htp.p(''{"success": true}'');
+      EXCEPTION WHEN OTHERS THEN
+        :status_code := 400;
+        htp.p(''{"success": false, "message": '' || apex_json.stringify(SQLERRM) || ''}'');
+      END;
+    ');
+
+  ORDS.DEFINE_PARAMETER(p_module_name => 'recibos', p_pattern => 'ubicacion', p_method => 'POST',
+      p_name => 'authorization', p_bind_variable_name => 'authorization',
+      p_source_type => 'HEADER', p_param_type => 'STRING', p_access_method => 'IN', p_comments => NULL);
+
+
+  -- ==================================================================
   -- LOV 1   GET /recibos/lov/clientes?q=
   -- ==================================================================
   -- Solo clientes con alguna cuota con saldo. Es el LOV de P3_COD_CLIENTE.
@@ -1052,6 +1208,38 @@ BEGIN
                      JOIN   ventas_cuotas  c1 ON c.id = c1.id
                      WHERE  c.cod_cliente = cl.cod_cliente
                      AND    NVL(c1.saldo_cuota, 0) <> 0)
+      ORDER BY cl.razon_social ASC
+    ');
+
+
+  -- ==================================================================
+  -- LOV 1b  GET /recibos/lov/clientes-todos
+  -- ==================================================================
+  -- Igual al anterior pero SIN el filtro de deuda: es el LOV de la página 5
+  -- (ubicaciones), que lista todos los clientes. Trae UBICACION para no tener
+  -- que pedir la ficha del cliente en una segunda llamada.
+  ORDS.DEFINE_TEMPLATE(
+      p_module_name    => 'recibos',
+      p_pattern        => 'lov/clientes-todos',
+      p_priority       => 0,
+      p_etag_type      => 'HASH',
+      p_etag_query     => NULL,
+      p_comments       => NULL);
+
+  ORDS.DEFINE_HANDLER(
+      p_module_name    => 'recibos',
+      p_pattern        => 'lov/clientes-todos',
+      p_method         => 'GET',
+      p_source_type    => 'json/collection',
+      p_mimes_allowed  => NULL,
+      p_comments       => NULL,
+      p_source         =>
+'      SELECT cl.cod_cliente                                        AS value,
+             NVL(cl.ci, cl.ruc) || '' '' || cl.razon_social         AS label,
+             cl.ci, cl.ruc, cl.nro_telefono, cl.nombre_fantasia,
+             cl.ubicacion
+      FROM   clientes cl
+      WHERE  cl.razon_social IS NOT NULL
       ORDER BY cl.razon_social ASC
     ');
 
