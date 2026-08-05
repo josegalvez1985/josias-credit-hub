@@ -93,10 +93,10 @@ class Ticket {
     return this.texto(t + "\n");
   }
 
-  // `ESC d n` parecía no mover el papel en la GL033, pero lo más probable es que
-  // nunca le llegara: son 3 bytes al final del envío, justo donde se perdía el
-  // último trozo BLE (ver `imprimir`). Igual el avance del pie se hace con
-  // `linea()`, que es lo que se probó que funciona; esto queda para otros modelos.
+  // ⚠ Sin uso: en la GL033 no se logró que moviera el papel de forma
+  // confiable (probado con n = 10, 12 y 22). Sea porque el modelo lo ignora o
+  // porque los 3 bytes se pierden al final del envío BLE, no conviene apoyarse
+  // en él. Queda para otras impresoras, pero medir antes de confiar.
   avanzar(n: number) {
     this.bytes.push(ESC, 0x64, n); // ESC d n
     return this;
@@ -141,8 +141,22 @@ export type DatosTicket = {
 export type TipoRecibo = "ORIGINAL" | "DUPLICADO";
 
 // Mismo contenido y mismo orden que el ticket de la app APEX (página 3,
-// acciones IMPRMIR y DUPLICADO).
-export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
+// acciones IMPRMIR y DUPLICADO), con una diferencia: **el ticket ya no lleva
+// el pie ORIGINAL/DUPLICADO**.
+//
+// El pie se imprimía en el cabezal, que queda unos centímetros antes de la
+// barra de corte, así que nunca salía con su propio ticket: aparecía encabezando
+// el siguiente. Desde la app se veía como que el botón imprimía el título
+// equivocado (ORIGINAL → sale ORIGINAL, DUPLICADO → vuelve a salir ORIGINAL, y
+// recién al segundo intento salía DUPLICADO).
+//
+// Se intentó empujar el papel con `ESC d n` (10, 12, 22) y con saltos de línea
+// (8 y 24); ninguna de las dos cosas movió el papel de forma confiable en la
+// GL033 —con 24 líneas el desfase empeoró y llegó a repetirse un recibo—, así
+// que el problema del transporte sigue abierto (ver `imprimir`). Sacar el pie
+// hace que el desfase deje de importar: el ticket que sale está completo y es
+// el correcto. `tipo` se mantiene en la firma porque WhatsApp sí lo usa.
+export function construirRecibo(d: DatosTicket, _tipo: TipoRecibo): Uint8Array {
   const t = new Ticket();
 
   t.iniciar().alinear(CENTRO);
@@ -171,31 +185,17 @@ export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
       d.concepto,
   );
 
-  // ORIGINAL / DUPLICADO va centrado y no a la derecha: alineado a la derecha
-  // en 58 mm quedaba pegado al borde y era lo primero que se perdía.
-  t.linea();
-  t.alinear(CENTRO).negrita(true).linea(tipo).negrita(false);
-  t.alinear(IZQUIERDA);
-
-  // El pie (ORIGINAL/DUPLICADO) se imprime en el cabezal, que está unos
-  // centímetros antes de la barra de corte. Ese tramo hay que empujarlo o el
-  // pie queda dentro de la impresora y sale recién con el ticket siguiente,
-  // encabezándolo — con el recibo entero desfasado un turno. El síntoma que se
-  // ve desde la app: presionás ORIGINAL y sale ORIGINAL, presionás DUPLICADO y
-  // vuelve a salir ORIGINAL, y recién al segundo DUPLICADO sale DUPLICADO.
+  // Tres saltos de separación entre un ticket y el siguiente. Es lo único que
+  // se manda al final: nada de avance largo (empeoraba el desfase) ni de
+  // `cortar()` (la GL033 no tiene cuchilla y toma GS V como un avance fijo de
+  // varios centímetros).
   //
-  // El avance va con saltos de línea y no con `avanzar()` (`ESC d n`): es lo
-  // que se probó que mueve papel en la GL033.
-  //
-  // Con 8 líneas el pie seguía sin salir. A 3 mm por línea, 24 líneas son ~7 cm,
-  // que cubre la zona muerta del cabezal a la barra con margen. Si se cambia de
-  // impresora, medir de nuevo: subir hasta que el pie salga en el mismo ticket,
-  // después bajar hasta que deje de sobrar papel.
-  for (let i = 0; i < 24; i++) t.linea();
+  // El corte se hace a mano contra la barra dentada, así que el último tramo
+  // del ticket queda dentro de la impresora hasta la impresión siguiente. Con
+  // el pie ORIGINAL/DUPLICADO eso importaba; sin él, lo que queda adentro son
+  // saltos en blanco.
+  t.linea().linea().linea();
 
-  // Sin `cortar()`: la GL033 no tiene cuchilla y además interpreta GS V como
-  // un avance fijo de varios centímetros, que era la mitad del papel que
-  // sobraba cuando el ticket sí salía completo.
   t.pulso();
   return t.build();
 }
@@ -245,22 +245,8 @@ export async function imprimir(bytes: Uint8Array): Promise<void> {
   // negocian un MTU mayor y descartan sin avisar lo que exceda ese tamaño; el
   // síntoma es que se pierde el final del ticket, que es donde va el corte.
   const TROZO = 20;
-
-  // El último trozo suele quedar corto y es el que más se pierde: ahí caían el
-  // avance del papel y el pulso del cajón, que van al final del ticket. Se
-  // rellena con `\n` hasta completar el múltiplo de 20, así lo que eventualmente
-  // se descarte sea relleno y no un comando. Los saltos de más no molestan:
-  // caen dentro del avance del pie, que ya son saltos de línea.
-  const faltan = (TROZO - (bytes.length % TROZO)) % TROZO;
-  let datos = bytes;
-  if (faltan > 0) {
-    datos = new Uint8Array(bytes.length + faltan);
-    datos.set(bytes);
-    datos.fill(0x0a, bytes.length); // \n
-  }
-
-  for (let i = 0; i < datos.length; i += TROZO) {
-    const parte = datos.slice(i, i + TROZO);
+  for (let i = 0; i < bytes.length; i += TROZO) {
+    const parte = bytes.slice(i, i + TROZO);
     if (c.properties.writeWithoutResponse && c.writeValueWithoutResponse) {
       await c.writeValueWithoutResponse(parte);
     } else {
