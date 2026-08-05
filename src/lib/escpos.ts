@@ -93,10 +93,10 @@ class Ticket {
     return this.texto(t + "\n");
   }
 
-  // ⚠ La GL033 de cobranzas ignora este comando: no mueve el papel. El avance
-  // del pie del recibo se hace con `linea()` (ver `construirRecibo`). Se deja
-  // por si se suma otra impresora que sí lo respete, pero no confiar en él sin
-  // probarlo antes contra el modelo nuevo.
+  // ⚠ Sin uso: no se logró que moviera el papel de forma reproducible en la
+  // GL033 (probado con n = 10, 12 y 22). El avance del pie se hace con
+  // `linea()`, que sí funciona (ver `construirRecibo`). Se deja por si otra
+  // impresora lo respeta, pero medir antes de confiar.
   avanzar(n: number) {
     this.bytes.push(ESC, 0x64, n); // ESC d n
     return this;
@@ -182,15 +182,17 @@ export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
   // pie queda dentro de la impresora y sale recién con el ticket siguiente,
   // encabezándolo — con el recibo entero desfasado un turno.
   //
-  // ⚠ La GL033 IGNORA `ESC d n` (el método `avanzar`). Se probó con 10, 12 y
-  // 22 y el papel no se movió nada: el pie salía siempre un ticket atrasado.
-  // Lo único que mueve papel en este modelo son los saltos de línea sueltos,
-  // así que el avance se hace con `linea()` y no con `avanzar()`.
+  // El avance va con saltos de línea, no con `avanzar()` (`ESC d n`): con este
+  // último no se logró mover el papel de forma reproducible en la GL033.
   //
-  // 8 líneas es lo que tarda el pie en llegar a la barra. Si se cambia de
-  // impresora, medir de nuevo: subir hasta que el pie salga en el mismo
+  // Calibrado contra la GL033 con impresiones reales:
+  //   8 → el ticket sale entero, pero sobran ~3 líneas de rollo por recibo
+  //   5 → el pie queda sobre la barra de corte
+  // Ojo al medir: si la impresora viene de una tanda de pruebas fallidas, hay
+  // que apagarla y prenderla antes, o el buffer sucio confunde el resultado.
+  // Si se cambia de modelo, repetir: subir hasta que el pie salga en el mismo
   // ticket, después bajar hasta que deje de sobrar papel.
-  for (let i = 0; i < 8; i++) t.linea();
+  for (let i = 0; i < 5; i++) t.linea();
 
   // Sin `cortar()`: la GL033 no tiene cuchilla y además interpreta GS V como
   // un avance fijo de varios centímetros, que era la mitad del papel que
