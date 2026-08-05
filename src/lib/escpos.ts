@@ -165,7 +165,10 @@ export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
 
   t.alinear(DERECHA).negrita(true).linea(tipo).negrita(false);
 
-  t.avanzar(1).cortar().pulso();
+  // Entre el cabezal y la cuchilla hay ~2-3 cm de papel. Con menos avance el
+  // corte cae sobre las últimas líneas y el ticket sale mutilado: hay que
+  // empujarlas fuera antes de cortar.
+  t.avanzar(5).cortar().pulso();
   return t.build();
 }
 
@@ -208,7 +211,12 @@ export async function imprimir(bytes: Uint8Array): Promise<void> {
   const c = await conectar();
 
   // BLE manda de a poco: los paquetes grandes se pierden en silencio.
-  const TROZO = 180;
+  //
+  // El trozo va a 20 bytes porque ese es el payload mínimo garantizado de una
+  // notificación BLE (MTU 23 - 3 de cabecera). Muchas térmicas baratas nunca
+  // negocian un MTU mayor y descartan sin avisar lo que exceda ese tamaño; el
+  // síntoma es que se pierde el final del ticket, que es donde va el corte.
+  const TROZO = 20;
   for (let i = 0; i < bytes.length; i += TROZO) {
     const parte = bytes.slice(i, i + TROZO);
     if (c.properties.writeWithoutResponse && c.writeValueWithoutResponse) {
@@ -216,8 +224,14 @@ export async function imprimir(bytes: Uint8Array): Promise<void> {
     } else {
       await c.writeValue(parte);
     }
-    await new Promise((r) => setTimeout(r, 30));
+    await new Promise((r) => setTimeout(r, 20));
   }
+
+  // writeValueWithoutResponse no espera confirmación: retorna cuando el byte
+  // salió del navegador, no cuando la impresora lo imprimió. Sin esta pausa,
+  // el cierre del GATT (o una segunda impresión) puede llegar antes de que
+  // vacíe el buffer y el ticket queda cortado a la mitad.
+  await new Promise((r) => setTimeout(r, 400));
 }
 
 // Suelta la impresora guardada para poder elegir otra.
