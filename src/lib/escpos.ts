@@ -93,15 +93,19 @@ class Ticket {
     return this.texto(t + "\n");
   }
 
+  // `ESC d n` parecía no mover el papel en la GL033, pero lo más probable es que
+  // nunca le llegara: son 3 bytes al final del envío, justo donde se perdía el
+  // último trozo BLE (ver `imprimir`). Igual el avance del pie se hace con
+  // `linea()`, que es lo que se probó que funciona; esto queda para otros modelos.
   avanzar(n: number) {
     this.bytes.push(ESC, 0x64, n); // ESC d n
     return this;
   }
 
-  // GS V 1 (corte parcial). La GO LINK GL033 que se usa en cobranzas no tiene
-  // cuchilla —se corta a mano contra la barra dentada— y este comando le pasa
-  // de largo. Se deja porque no molesta y otras impresoras sí lo usan, pero el
-  // papel que hace falta para llegar a la barra lo tiene que dar `avanzar`.
+  // ⚠ GS V 1 (corte parcial). La GL033 no tiene cuchilla —se corta a mano
+  // contra la barra dentada— y además interpreta este comando como un avance
+  // fijo de varios centímetros, o sea papel desperdiciado en cada recibo. Por
+  // eso `construirRecibo` NO lo usa.
   cortar() {
     this.bytes.push(GS, 0x56, 0x01);
     return this;
@@ -173,20 +177,26 @@ export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
   t.alinear(CENTRO).negrita(true).linea(tipo).negrita(false);
   t.alinear(IZQUIERDA);
 
-  // El pie (ORIGINAL/DUPLICADO) se imprime en el cabezal, que está ~3 cm antes
-  // de la barra de corte. Sin avance suficiente ese tramo queda dentro de la
-  // impresora y el pie sale recién con el ticket siguiente, encabezándolo.
+  // El pie (ORIGINAL/DUPLICADO) se imprime en el cabezal, que está unos
+  // centímetros antes de la barra de corte. Ese tramo hay que empujarlo o el
+  // pie queda dentro de la impresora y sale recién con el ticket siguiente,
+  // encabezándolo — con el recibo entero desfasado un turno. El síntoma que se
+  // ve desde la app: presionás ORIGINAL y sale ORIGINAL, presionás DUPLICADO y
+  // vuelve a salir ORIGINAL, y recién al segundo DUPLICADO sale DUPLICADO.
   //
-  // Calibrado contra la GL033 con impresiones reales:
-  //   10, 12 → el pie no llega a salir
-  //   30     → sale, pero sobran ~8 cm de rollo por recibo
-  // De ahí que la zona muerta sean ~22 líneas. Con 22 el pie queda justo sobre
-  // la barra, que es donde se corta a mano.
+  // El avance va con saltos de línea y no con `avanzar()` (`ESC d n`): es lo
+  // que se probó que mueve papel en la GL033.
   //
-  // Es un valor mecánico de ESTA impresora: si se cambia de modelo hay que
-  // volver a medirlo (subir hasta que el pie salga, después bajar hasta que
-  // deje de sobrar papel).
-  t.avanzar(22).cortar().pulso();
+  // Con 8 líneas el pie seguía sin salir. A 3 mm por línea, 24 líneas son ~7 cm,
+  // que cubre la zona muerta del cabezal a la barra con margen. Si se cambia de
+  // impresora, medir de nuevo: subir hasta que el pie salga en el mismo ticket,
+  // después bajar hasta que deje de sobrar papel.
+  for (let i = 0; i < 24; i++) t.linea();
+
+  // Sin `cortar()`: la GL033 no tiene cuchilla y además interpreta GS V como
+  // un avance fijo de varios centímetros, que era la mitad del papel que
+  // sobraba cuando el ticket sí salía completo.
+  t.pulso();
   return t.build();
 }
 
@@ -235,8 +245,22 @@ export async function imprimir(bytes: Uint8Array): Promise<void> {
   // negocian un MTU mayor y descartan sin avisar lo que exceda ese tamaño; el
   // síntoma es que se pierde el final del ticket, que es donde va el corte.
   const TROZO = 20;
-  for (let i = 0; i < bytes.length; i += TROZO) {
-    const parte = bytes.slice(i, i + TROZO);
+
+  // El último trozo suele quedar corto y es el que más se pierde: ahí caían el
+  // avance del papel y el pulso del cajón, que van al final del ticket. Se
+  // rellena con `\n` hasta completar el múltiplo de 20, así lo que eventualmente
+  // se descarte sea relleno y no un comando. Los saltos de más no molestan:
+  // caen dentro del avance del pie, que ya son saltos de línea.
+  const faltan = (TROZO - (bytes.length % TROZO)) % TROZO;
+  let datos = bytes;
+  if (faltan > 0) {
+    datos = new Uint8Array(bytes.length + faltan);
+    datos.set(bytes);
+    datos.fill(0x0a, bytes.length); // \n
+  }
+
+  for (let i = 0; i < datos.length; i += TROZO) {
+    const parte = datos.slice(i, i + TROZO);
     if (c.properties.writeWithoutResponse && c.writeValueWithoutResponse) {
       await c.writeValueWithoutResponse(parte);
     } else {
