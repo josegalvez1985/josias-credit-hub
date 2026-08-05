@@ -173,15 +173,20 @@ export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
   t.alinear(CENTRO).negrita(true).linea(tipo).negrita(false);
   t.alinear(IZQUIERDA);
 
-  // Entre el cabezal y la barra de corte de la GL033 hay ~3 cm de papel: lo
-  // que se imprima en ese tramo queda adentro de la impresora hasta que el
-  // siguiente ticket lo empuja, y el pie del recibo termina encabezando el que
-  // viene. Estas líneas son las que empujan el pie hasta la barra.
+  // El pie (ORIGINAL/DUPLICADO) se imprime en el cabezal, que está ~3 cm antes
+  // de la barra de corte. Sin avance suficiente ese tramo queda dentro de la
+  // impresora y el pie sale recién con el ticket siguiente, encabezándolo.
   //
-  // Calibrado contra la GL033: con 12 no salía el ORIGINAL, con 24 salía pero
-  // sobraban ~8 cm de rollo por recibo. 10 deja el pie justo arriba de la
-  // barra, que es donde se corta a mano.
-  t.avanzar(10).cortar().pulso();
+  // Calibrado contra la GL033 con impresiones reales:
+  //   10, 12 → el pie no llega a salir
+  //   30     → sale, pero sobran ~8 cm de rollo por recibo
+  // De ahí que la zona muerta sean ~22 líneas. Con 22 el pie queda justo sobre
+  // la barra, que es donde se corta a mano.
+  //
+  // Es un valor mecánico de ESTA impresora: si se cambia de modelo hay que
+  // volver a medirlo (subir hasta que el pie salga, después bajar hasta que
+  // deje de sobrar papel).
+  t.avanzar(22).cortar().pulso();
   return t.build();
 }
 
