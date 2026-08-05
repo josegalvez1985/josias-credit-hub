@@ -98,8 +98,12 @@ class Ticket {
     return this;
   }
 
+  // GS V 1 (corte parcial). La GO LINK GL033 que se usa en cobranzas no tiene
+  // cuchilla —se corta a mano contra la barra dentada— y este comando le pasa
+  // de largo. Se deja porque no molesta y otras impresoras sí lo usan, pero el
+  // papel que hace falta para llegar a la barra lo tiene que dar `avanzar`.
   cortar() {
-    this.bytes.push(GS, 0x56, 0x01); // GS V 1 — corte parcial
+    this.bytes.push(GS, 0x56, 0x01);
     return this;
   }
 
@@ -163,13 +167,15 @@ export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
       d.concepto,
   );
 
+  t.linea();
   t.alinear(DERECHA).negrita(true).linea(tipo).negrita(false);
 
-  // Entre el cabezal y la cuchilla hay ~2-3 cm de papel. Con menos avance el
-  // corte cae sobre las últimas líneas y el ticket sale mutilado: hay que
-  // empujarlas fuera antes de cortar. Calibrado contra la impresora en uso:
-  // con 5 todavía se comía el pie, con 9 sale entero.
-  t.avanzar(9).cortar().pulso();
+  // Entre el cabezal y la barra de corte de la GL033 hay ~3 cm de papel: todo
+  // lo que se imprime en ese tramo queda adentro de la impresora hasta que el
+  // siguiente ticket lo empuja. Sin avance suficiente el pie del recibo no
+  // llega a salir nunca y el `ORIGINAL` aparece encabezando el ticket que
+  // viene. A ~24 líneas por pulgada, 12 líneas son los ~3 cm que hacen falta.
+  t.avanzar(12).cortar().pulso();
   return t.build();
 }
 
