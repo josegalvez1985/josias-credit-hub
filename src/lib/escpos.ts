@@ -167,8 +167,9 @@ export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
 
   // Entre el cabezal y la cuchilla hay ~2-3 cm de papel. Con menos avance el
   // corte cae sobre las últimas líneas y el ticket sale mutilado: hay que
-  // empujarlas fuera antes de cortar.
-  t.avanzar(5).cortar().pulso();
+  // empujarlas fuera antes de cortar. Calibrado contra la impresora en uso:
+  // con 5 todavía se comía el pie, con 9 sale entero.
+  t.avanzar(9).cortar().pulso();
   return t.build();
 }
 
