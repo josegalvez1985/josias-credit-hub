@@ -167,15 +167,26 @@ export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
       d.concepto,
   );
 
+  // ORIGINAL / DUPLICADO va centrado y no a la derecha: alineado a la derecha
+  // en 58 mm quedaba pegado al borde y era lo primero que se perdía.
   t.linea();
-  t.alinear(DERECHA).negrita(true).linea(tipo).negrita(false);
+  t.alinear(CENTRO).negrita(true).linea(tipo).negrita(false);
+  t.alinear(IZQUIERDA);
 
   // Entre el cabezal y la barra de corte de la GL033 hay ~3 cm de papel: todo
   // lo que se imprime en ese tramo queda adentro de la impresora hasta que el
   // siguiente ticket lo empuja. Sin avance suficiente el pie del recibo no
   // llega a salir nunca y el `ORIGINAL` aparece encabezando el ticket que
-  // viene. A ~24 líneas por pulgada, 12 líneas son los ~3 cm que hacen falta.
-  t.avanzar(12).cortar().pulso();
+  // viene. A ~24 líneas por pulgada hacen falta ~24 líneas para los ~3 cm,
+  // más margen para poder cortar sin comerse el pie.
+  t.avanzar(24);
+
+  // `avanzar` es ESC d n, que algunas impresoras baratas recortan o ignoran si
+  // n es grande. Los saltos de línea sueltos no fallan nunca: son el respaldo
+  // de que el pie salga sí o sí.
+  for (let i = 0; i < 6; i++) t.linea();
+
+  t.cortar().pulso();
   return t.build();
 }
 
