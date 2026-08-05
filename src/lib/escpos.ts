@@ -173,20 +173,15 @@ export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
   t.alinear(CENTRO).negrita(true).linea(tipo).negrita(false);
   t.alinear(IZQUIERDA);
 
-  // Entre el cabezal y la barra de corte de la GL033 hay ~3 cm de papel: todo
-  // lo que se imprime en ese tramo queda adentro de la impresora hasta que el
-  // siguiente ticket lo empuja. Sin avance suficiente el pie del recibo no
-  // llega a salir nunca y el `ORIGINAL` aparece encabezando el ticket que
-  // viene. A ~24 líneas por pulgada hacen falta ~24 líneas para los ~3 cm,
-  // más margen para poder cortar sin comerse el pie.
-  t.avanzar(24);
-
-  // `avanzar` es ESC d n, que algunas impresoras baratas recortan o ignoran si
-  // n es grande. Los saltos de línea sueltos no fallan nunca: son el respaldo
-  // de que el pie salga sí o sí.
-  for (let i = 0; i < 6; i++) t.linea();
-
-  t.cortar().pulso();
+  // Entre el cabezal y la barra de corte de la GL033 hay ~3 cm de papel: lo
+  // que se imprima en ese tramo queda adentro de la impresora hasta que el
+  // siguiente ticket lo empuja, y el pie del recibo termina encabezando el que
+  // viene. Estas líneas son las que empujan el pie hasta la barra.
+  //
+  // Calibrado contra la GL033: con 12 no salía el ORIGINAL, con 24 salía pero
+  // sobraban ~8 cm de rollo por recibo. 10 deja el pie justo arriba de la
+  // barra, que es donde se corta a mano.
+  t.avanzar(10).cortar().pulso();
   return t.build();
 }
 
