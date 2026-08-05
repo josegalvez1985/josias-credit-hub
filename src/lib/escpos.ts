@@ -93,10 +93,10 @@ class Ticket {
     return this.texto(t + "\n");
   }
 
-  // ⚠ Sin uso: en la GL033 no se logró que moviera el papel de forma
-  // confiable (probado con n = 10, 12 y 22). Sea porque el modelo lo ignora o
-  // porque los 3 bytes se pierden al final del envío BLE, no conviene apoyarse
-  // en él. Queda para otras impresoras, pero medir antes de confiar.
+  // ⚠ La GL033 de cobranzas ignora este comando: no mueve el papel. El avance
+  // del pie del recibo se hace con `linea()` (ver `construirRecibo`). Se deja
+  // por si se suma otra impresora que sí lo respete, pero no confiar en él sin
+  // probarlo antes contra el modelo nuevo.
   avanzar(n: number) {
     this.bytes.push(ESC, 0x64, n); // ESC d n
     return this;
@@ -141,22 +141,8 @@ export type DatosTicket = {
 export type TipoRecibo = "ORIGINAL" | "DUPLICADO";
 
 // Mismo contenido y mismo orden que el ticket de la app APEX (página 3,
-// acciones IMPRMIR y DUPLICADO), con una diferencia: **el ticket ya no lleva
-// el pie ORIGINAL/DUPLICADO**.
-//
-// El pie se imprimía en el cabezal, que queda unos centímetros antes de la
-// barra de corte, así que nunca salía con su propio ticket: aparecía encabezando
-// el siguiente. Desde la app se veía como que el botón imprimía el título
-// equivocado (ORIGINAL → sale ORIGINAL, DUPLICADO → vuelve a salir ORIGINAL, y
-// recién al segundo intento salía DUPLICADO).
-//
-// Se intentó empujar el papel con `ESC d n` (10, 12, 22) y con saltos de línea
-// (8 y 24); ninguna de las dos cosas movió el papel de forma confiable en la
-// GL033 —con 24 líneas el desfase empeoró y llegó a repetirse un recibo—, así
-// que el problema del transporte sigue abierto (ver `imprimir`). Sacar el pie
-// hace que el desfase deje de importar: el ticket que sale está completo y es
-// el correcto. `tipo` se mantiene en la firma porque WhatsApp sí lo usa.
-export function construirRecibo(d: DatosTicket, _tipo: TipoRecibo): Uint8Array {
+// acciones IMPRMIR y DUPLICADO).
+export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
   const t = new Ticket();
 
   t.iniciar().alinear(CENTRO);
@@ -185,17 +171,30 @@ export function construirRecibo(d: DatosTicket, _tipo: TipoRecibo): Uint8Array {
       d.concepto,
   );
 
-  // Tres saltos de separación entre un ticket y el siguiente. Es lo único que
-  // se manda al final: nada de avance largo (empeoraba el desfase) ni de
-  // `cortar()` (la GL033 no tiene cuchilla y toma GS V como un avance fijo de
-  // varios centímetros).
-  //
-  // El corte se hace a mano contra la barra dentada, así que el último tramo
-  // del ticket queda dentro de la impresora hasta la impresión siguiente. Con
-  // el pie ORIGINAL/DUPLICADO eso importaba; sin él, lo que queda adentro son
-  // saltos en blanco.
-  t.linea().linea().linea();
+  // ORIGINAL / DUPLICADO va centrado y no a la derecha: alineado a la derecha
+  // en 58 mm quedaba pegado al borde y era lo primero que se perdía.
+  t.linea();
+  t.alinear(CENTRO).negrita(true).linea(tipo).negrita(false);
+  t.alinear(IZQUIERDA);
 
+  // El pie (ORIGINAL/DUPLICADO) se imprime en el cabezal, que está unos
+  // centímetros antes de la barra de corte. Ese tramo hay que empujarlo o el
+  // pie queda dentro de la impresora y sale recién con el ticket siguiente,
+  // encabezándolo — con el recibo entero desfasado un turno.
+  //
+  // ⚠ La GL033 IGNORA `ESC d n` (el método `avanzar`). Se probó con 10, 12 y
+  // 22 y el papel no se movió nada: el pie salía siempre un ticket atrasado.
+  // Lo único que mueve papel en este modelo son los saltos de línea sueltos,
+  // así que el avance se hace con `linea()` y no con `avanzar()`.
+  //
+  // 8 líneas es lo que tarda el pie en llegar a la barra. Si se cambia de
+  // impresora, medir de nuevo: subir hasta que el pie salga en el mismo
+  // ticket, después bajar hasta que deje de sobrar papel.
+  for (let i = 0; i < 8; i++) t.linea();
+
+  // Sin `cortar()`: la GL033 no tiene cuchilla y además interpreta GS V como
+  // un avance fijo de varios centímetros, que era la mitad del papel que
+  // sobraba cuando el ticket sí salía completo.
   t.pulso();
   return t.build();
 }
