@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Printer, Copy, MessageCircle, Loader2, Send, Check } from "lucide-react";
+import { Printer, Copy, MessageCircle, Loader2, Send, Check, Usb, Bluetooth } from "lucide-react";
 import { imprimirRecibo, soportaImpresion, type DatosTicket } from "@/lib/escpos";
+import { imprimirReciboUsb, olvidarImpresoraUsb, soportaImpresionUsb } from "@/lib/escpos-usb";
 import type { ReciboDetalle } from "@/lib/api";
 import {
   abrirWhatsApp,
@@ -38,7 +39,8 @@ export function ticketDesdeRecibo(d: ReciboDetalle): DatosTicket {
   };
 }
 
-// Las tres acciones de la página 3 de APEX: Original, Duplicado y WhatsApp.
+// Las tres acciones de la página 3 de APEX: Original, Duplicado y WhatsApp,
+// más la impresión por USB (WebUSB), que APEX no tenía.
 export function ReciboAcciones({
   datos,
   telefono,
@@ -47,6 +49,7 @@ export function ReciboAcciones({
   telefono?: string | null;
 }) {
   const [imprimiendo, setImprimiendo] = useState<"ORIGINAL" | "DUPLICADO" | null>(null);
+  const [imprimiendoUsb, setImprimiendoUsb] = useState<"ORIGINAL" | "DUPLICADO" | null>(null);
   const [abierto, setAbierto] = useState(false);
 
   async function imprimir(tipo: "ORIGINAL" | "DUPLICADO") {
@@ -63,7 +66,25 @@ export function ReciboAcciones({
     }
   }
 
+  // Mismo ticket que el Bluetooth (comparten `construirRecibo`), otro cable.
+  // `todos` abre el selector sin el filtro de clase 7, para las térmicas
+  // clonadas que no la declaran y por eso no aparecen en la lista.
+  async function imprimirPorUsb(tipo: "ORIGINAL" | "DUPLICADO", todos = false) {
+    setImprimiendoUsb(tipo);
+    try {
+      await imprimirReciboUsb(datos, tipo, todos);
+      toast.success(`${tipo === "ORIGINAL" ? "Original" : "Duplicado"} enviado por USB`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al imprimir";
+      if (msg !== "cancelado") toast.error(msg);
+    } finally {
+      setImprimiendoUsb(null);
+    }
+  }
+
   const puedeImprimir = soportaImpresion();
+  const puedeImprimirUsb = soportaImpresionUsb();
+  const ocupado = imprimiendo !== null || imprimiendoUsb !== null;
 
   return (
     <>
@@ -72,7 +93,7 @@ export function ReciboAcciones({
           type="button"
           variant="outline"
           onClick={() => imprimir("ORIGINAL")}
-          disabled={imprimiendo !== null || !puedeImprimir}
+          disabled={ocupado || !puedeImprimir}
           className="flex-1"
         >
           {imprimiendo === "ORIGINAL" ? (
@@ -87,7 +108,7 @@ export function ReciboAcciones({
           type="button"
           variant="outline"
           onClick={() => imprimir("DUPLICADO")}
-          disabled={imprimiendo !== null || !puedeImprimir}
+          disabled={ocupado || !puedeImprimir}
           className="flex-1"
         >
           {imprimiendo === "DUPLICADO" ? (
@@ -107,10 +128,71 @@ export function ReciboAcciones({
         </Button>
       </div>
 
+      {/* Impresión por USB. Va en su propia fila, rotulada, para que no se
+          confunda con los botones de Bluetooth de arriba: son la misma acción
+          por dos cables distintos y el cobrador tiene que saber cuál toca. */}
+      {puedeImprimirUsb && (
+        <div className="space-y-1.5">
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Usb className="h-3.5 w-3.5" /> Impresora por cable USB
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => imprimirPorUsb("ORIGINAL")}
+              disabled={ocupado}
+              className="flex-1"
+            >
+              {imprimiendoUsb === "ORIGINAL" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Printer className="h-4 w-4" />
+              )}
+              Original USB
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => imprimirPorUsb("DUPLICADO")}
+              disabled={ocupado}
+              className="flex-1"
+            >
+              {imprimiendoUsb === "DUPLICADO" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+              Duplicado USB
+            </Button>
+          </div>
+
+          {/* Escape para dos casos que si no dejan al cobrador trabado: la
+              impresora clonada que no aparece en el selector, y la impresora
+              equivocada ya elegida en esta sesión. */}
+          <button
+            type="button"
+            onClick={async () => {
+              await olvidarImpresoraUsb();
+              await imprimirPorUsb("ORIGINAL", true);
+            }}
+            disabled={ocupado}
+            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+          >
+            ¿No aparece la impresora? Elegir otra
+          </button>
+        </div>
+      )}
+
       {!puedeImprimir && (
-        <p className="text-xs text-muted-foreground">
-          La impresión Bluetooth necesita Chrome en Android. En este dispositivo podés enviar el
-          recibo por WhatsApp.
+        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+          <Bluetooth className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            La impresión Bluetooth necesita Chrome en Android. En este dispositivo podés
+            {puedeImprimirUsb ? " imprimir por USB o " : " "}
+            enviar el recibo por WhatsApp.
+          </span>
         </p>
       )}
 

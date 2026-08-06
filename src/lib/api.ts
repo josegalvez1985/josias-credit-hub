@@ -586,6 +586,202 @@ export function montoEnLetras(monto: number) {
   return request<{ monto_letras: string }>(`/recibos/letras/${monto}`).then((r) => r.monto_letras);
 }
 
+// ----- Operaciones / Solicitud de Créditos (modulo ORDS "operaciones") -----
+//
+// Migra la pagina 18 de APEX ("Facturas" / Creditos Otorgados). Es SOLO
+// LECTURA: no hay POST/PUT/DELETE a proposito. VENTAS_CABECERA tiene cinco
+// triggers que regeneran el plan de VENTAS_CUOTAS, de donde cuelgan los saldos
+// y los recibos ya cobrados (ver backend/operaciones.sql).
+//
+// Ojo: estas tablas VENTAS_* NO son las mismas que SOLICITUD_VENTAS_* del
+// modulo `solicitudes`. Aquellas son la solicitud que carga el asesor; estas
+// son el credito ya otorgado.
+
+export type CreditoRow = {
+  id: number;
+  nro_solicitud: number;
+  fecha_factura?: string; // YYYY-MM-DD
+  referencia?: string;
+  cod_cliente?: number;
+  razon_social?: string;
+  documento?: string;
+  nro_telefono?: string;
+  cantidad_cuotas?: number;
+  total?: number;
+  monto_cuota?: number;
+  entrega_inicial?: number;
+  porc_interes?: number;
+  fec_vencimiento_inicial?: string;
+  cod_ciudad?: number;
+  ciudad?: string;
+  cod_vendedor?: number;
+  vendedor?: string;
+  id_solicitud?: number;
+};
+
+export type CreditoCabecera = CreditoRow & {
+  nombre_fantasia?: string;
+  ci?: string;
+  ruc?: string;
+  direccion?: string;
+  nro_casa?: number;
+  estado_civil?: string;
+  fecha_nacimiento?: string;
+  ciudad_cliente?: string;
+  // Viene de SOLICITUD_VENTAS_CABECERA via ID_SOLICITUD, igual que en el
+  // proceso GET_SOLICITUD_PDF de la pagina 57. Los creditos viejos tienen
+  // ID_SOLICITUD en NULL y ahi el estado llega vacio.
+  estado?: string;
+  // NUM_LETRAS(total) resuelto en Oracle — la misma funcion que usa el recibo
+  // termico. Va en el pagare, donde el monto se escribe en letras.
+  total_letras?: string;
+};
+
+export type CreditoArticulo = {
+  id_detalle: number;
+  id: number;
+  cod_articulo?: number;
+  articulo?: string;
+  cantidad?: number;
+  precio_unitario?: number;
+  subtotal?: number;
+};
+
+export type CreditoActividad = {
+  id_detalle: number;
+  id: number;
+  es_empleado?: string; // 'S' | 'N'
+  nombre_empresa?: string;
+  direccion?: string;
+  puesto_ocupado?: string;
+  ingresos_mensuales?: number;
+  otros_ingresos?: number;
+  antiguedad?: string;
+  telefono?: string;
+  cod_profesion?: number;
+  profesion?: string;
+  cod_ciudad?: number;
+  ciudad?: string;
+  aporta_ips?: string; // 'S' | 'N'
+};
+
+export type CreditoReferencia = {
+  id_detalle: number;
+  id: number;
+  relacion?: string;
+  // VENTAS_REFERENCIAS.RELACION es VARCHAR2 sin FK y guarda el COD_RELACION
+  // como texto. El backend resuelve la descripcion y cae al valor crudo si no
+  // matchea, asi que esto siempre trae algo mostrable.
+  relacion_desc?: string;
+  telefono?: string;
+  nombre_apellido?: string;
+  ind_garante?: string; // 'S' | 'N'
+};
+
+export type CreditoCuota = {
+  id: number;
+  nro_cuota: number; // 0 = entrega inicial
+  fec_vencimiento?: string;
+  monto_cuota?: number;
+  saldo_cuota?: number;
+  cobrado?: number;
+  fec_derivacion?: string;
+};
+
+// El listado NO se trae entero: pagina y busca el servidor.
+//
+// ⚠ Pagina con `page`, NO con `limit`/`offset`. La diferencia con
+// `listarRecibos` no es un descuido: los dos handlers son de tipo distinto.
+//   - `recibos` es `plsql/block`: su PL/SQL declara :limit y :offset y arma
+//     el JSON a mano, asi que son parametros SUYOS.
+//   - `operaciones/creditos` es `json/query`: la paginacion la maneja ORDS
+//     con su propio esquema (?page=N, de a p_items_per_page filas). Ahi
+//     `limit` y `offset` no existen — mandarlos devuelve items:[] sin ningun
+//     error que lo delate. Costo una tarde el 2026-08-06.
+//
+// El tamaño de pagina lo fija el modulo (p_items_per_page => 30 en
+// operaciones.sql), no el cliente: son los 30 que trae la primera carga y
+// cada "Mostrar mas". El SQL no lleva ROWNUM, asi que el boton puede seguir
+// pidiendo paginas hasta agotar la tabla.
+//
+// El parametro de busqueda es `buscar` y no `q`: `q` es reservado de ORDS y
+// nunca llega al bind del handler.
+export async function listarCreditos(f: { buscar?: string; page?: number } = {}) {
+  const qs = new URLSearchParams();
+  if (f.buscar?.trim()) qs.set("buscar", f.buscar.trim());
+  if (f.page) qs.set("page", String(f.page));
+  const r = await request<{ items: CreditoRow[]; hasMore?: boolean; next?: unknown }>(
+    `/operaciones/creditos${qs.toString() ? `?${qs}` : ""}`,
+  );
+  // ORDS no manda `hasMore` en json/query: manda un link `next` cuando hay
+  // mas paginas. Es la señal que usa el boton "Cargar mas".
+  return { items: r.items ?? [], hasMore: Boolean(r.next) };
+}
+
+export function obtenerCredito(id: number) {
+  return request<CreditoCabecera>(`/operaciones/credito/${id}`);
+}
+
+// Los cuatro hijos van SIN `?limit=`: son handlers json/query, donde ese
+// parametro no existe y devuelve items:[] (ver listarCreditos).
+//
+// Se recorren las paginas de ORDS con `page`, que es como pagina json/query.
+// En la practica un credito tiene pocos articulos y a lo sumo 15-18 cuotas,
+// asi que casi siempre alcanza la primera pagina; el bucle esta para que un
+// credito grande no aparezca cortado en silencio.
+async function feedCredito<T>(path: string): Promise<T[]> {
+  const out: T[] = [];
+  for (let page = 0; ; page++) {
+    const sep = path.includes("?") ? "&" : "?";
+    const f = await request<OrdsFeed<T> & { next?: unknown }>(
+      `${path}${page ? `${sep}page=${page}` : ""}`,
+    );
+    const items = f.items ?? [];
+    out.push(...items);
+    if (!f.next || items.length === 0) break;
+  }
+  return out;
+}
+
+export function listarCreditoArticulos(id: number) {
+  return feedCredito<CreditoArticulo>(`/operaciones/credito/${id}/articulos`);
+}
+
+export function listarCreditoActividad(id: number) {
+  return feedCredito<CreditoActividad>(`/operaciones/credito/${id}/actividad`);
+}
+
+export function listarCreditoReferencias(id: number) {
+  return feedCredito<CreditoReferencia>(`/operaciones/credito/${id}/referencias`);
+}
+
+export function listarCreditoCuotas(id: number) {
+  return feedCredito<CreditoCuota>(`/operaciones/credito/${id}/cuotas`);
+}
+
+export type CreditoCompleto = {
+  cabecera: CreditoCabecera;
+  articulos: CreditoArticulo[];
+  actividad: CreditoActividad[];
+  referencias: CreditoReferencia[];
+  cuotas: CreditoCuota[];
+};
+
+// Trae el credito entero para la pantalla de detalle y los impresos. Los
+// cuatro hijos van en paralelo y cada uno con su .catch(): un bloque vacio o
+// que falle no tiene que tumbar la pagina, igual que con los LOV del detalle
+// de solicitudes.
+export async function obtenerCreditoCompleto(id: number): Promise<CreditoCompleto> {
+  const [cabecera, articulos, actividad, referencias, cuotas] = await Promise.all([
+    obtenerCredito(id),
+    listarCreditoArticulos(id).catch(() => [] as CreditoArticulo[]),
+    listarCreditoActividad(id).catch(() => [] as CreditoActividad[]),
+    listarCreditoReferencias(id).catch(() => [] as CreditoReferencia[]),
+    listarCreditoCuotas(id).catch(() => [] as CreditoCuota[]),
+  ]);
+  return { cabecera, articulos, actividad, referencias, cuotas };
+}
+
 // Crea la solicitud completa de forma secuencial: cabecera -> hijos.
 // Si falla a mitad, lanza error indicando el paso (puede quedar data parcial).
 export async function crearSolicitud(s: SolicitudCompleta): Promise<{ id: number }> {

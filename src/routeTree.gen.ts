@@ -17,8 +17,10 @@ import { Route as AppRecibosRouteImport } from './routes/_app.recibos'
 import { Route as AppPreciosRouteImport } from './routes/_app.precios'
 import { Route as AppPerfilRouteImport } from './routes/_app.perfil'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppAdminRouteImport } from './routes/_app.admin'
 import { Route as AppSolicitudesIndexRouteImport } from './routes/_app.solicitudes.index'
 import { Route as AppRecibosIndexRouteImport } from './routes/_app.recibos.index'
+import { Route as AppAdminIndexRouteImport } from './routes/_app.admin.index'
 import { Route as AppSolicitudesNuevaRouteImport } from './routes/_app.solicitudes.nueva'
 import { Route as AppSolicitudesIdRouteImport } from './routes/_app.solicitudes.$id'
 import { Route as AppRecibosUbicacionesRouteImport } from './routes/_app.recibos.ubicaciones'
@@ -28,6 +30,8 @@ import { Route as AppRecibosDerivacionesRouteImport } from './routes/_app.recibo
 import { Route as AppRecibosClientesRouteImport } from './routes/_app.recibos.clientes'
 import { Route as AppRecibosCargarUbicacionRouteImport } from './routes/_app.recibos.cargar-ubicacion'
 import { Route as AppClientesNuevoRouteImport } from './routes/_app.clientes.nuevo'
+import { Route as AppAdminCreditosIndexRouteImport } from './routes/_app.admin.creditos.index'
+import { Route as AppAdminCreditosIdRouteImport } from './routes/_app.admin.creditos.$id'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -68,6 +72,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminRoute = AppAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSolicitudesIndexRoute = AppSolicitudesIndexRouteImport.update({
   id: '/solicitudes/',
   path: '/solicitudes/',
@@ -77,6 +86,11 @@ const AppRecibosIndexRoute = AppRecibosIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRecibosRoute,
+} as any)
+const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppAdminRoute,
 } as any)
 const AppSolicitudesNuevaRoute = AppSolicitudesNuevaRouteImport.update({
   id: '/solicitudes/nueva',
@@ -125,11 +139,22 @@ const AppClientesNuevoRoute = AppClientesNuevoRouteImport.update({
   path: '/clientes/nuevo',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminCreditosIndexRoute = AppAdminCreditosIndexRouteImport.update({
+  id: '/creditos/',
+  path: '/creditos/',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminCreditosIdRoute = AppAdminCreditosIdRouteImport.update({
+  id: '/creditos/$id',
+  path: '/creditos/$id',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/admin': typeof AppAdminRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
   '/perfil': typeof AppPerfilRoute
   '/precios': typeof AppPreciosRoute
@@ -143,8 +168,11 @@ export interface FileRoutesByFullPath {
   '/recibos/ubicaciones': typeof AppRecibosUbicacionesRoute
   '/solicitudes/$id': typeof AppSolicitudesIdRoute
   '/solicitudes/nueva': typeof AppSolicitudesNuevaRoute
+  '/admin/': typeof AppAdminIndexRoute
   '/recibos/': typeof AppRecibosIndexRoute
   '/solicitudes/': typeof AppSolicitudesIndexRoute
+  '/admin/creditos/$id': typeof AppAdminCreditosIdRoute
+  '/admin/creditos/': typeof AppAdminCreditosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -162,8 +190,11 @@ export interface FileRoutesByTo {
   '/recibos/ubicaciones': typeof AppRecibosUbicacionesRoute
   '/solicitudes/$id': typeof AppSolicitudesIdRoute
   '/solicitudes/nueva': typeof AppSolicitudesNuevaRoute
+  '/admin': typeof AppAdminIndexRoute
   '/recibos': typeof AppRecibosIndexRoute
   '/solicitudes': typeof AppSolicitudesIndexRoute
+  '/admin/creditos/$id': typeof AppAdminCreditosIdRoute
+  '/admin/creditos': typeof AppAdminCreditosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -171,6 +202,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/_app/admin': typeof AppAdminRouteWithChildren
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/perfil': typeof AppPerfilRoute
   '/_app/precios': typeof AppPreciosRoute
@@ -184,8 +216,11 @@ export interface FileRoutesById {
   '/_app/recibos/ubicaciones': typeof AppRecibosUbicacionesRoute
   '/_app/solicitudes/$id': typeof AppSolicitudesIdRoute
   '/_app/solicitudes/nueva': typeof AppSolicitudesNuevaRoute
+  '/_app/admin/': typeof AppAdminIndexRoute
   '/_app/recibos/': typeof AppRecibosIndexRoute
   '/_app/solicitudes/': typeof AppSolicitudesIndexRoute
+  '/_app/admin/creditos/$id': typeof AppAdminCreditosIdRoute
+  '/_app/admin/creditos/': typeof AppAdminCreditosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -193,6 +228,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/sitemap.xml'
+    | '/admin'
     | '/dashboard'
     | '/perfil'
     | '/precios'
@@ -206,8 +242,11 @@ export interface FileRouteTypes {
     | '/recibos/ubicaciones'
     | '/solicitudes/$id'
     | '/solicitudes/nueva'
+    | '/admin/'
     | '/recibos/'
     | '/solicitudes/'
+    | '/admin/creditos/$id'
+    | '/admin/creditos/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -225,14 +264,18 @@ export interface FileRouteTypes {
     | '/recibos/ubicaciones'
     | '/solicitudes/$id'
     | '/solicitudes/nueva'
+    | '/admin'
     | '/recibos'
     | '/solicitudes'
+    | '/admin/creditos/$id'
+    | '/admin/creditos'
   id:
     | '__root__'
     | '/'
     | '/_app'
     | '/login'
     | '/sitemap.xml'
+    | '/_app/admin'
     | '/_app/dashboard'
     | '/_app/perfil'
     | '/_app/precios'
@@ -246,8 +289,11 @@ export interface FileRouteTypes {
     | '/_app/recibos/ubicaciones'
     | '/_app/solicitudes/$id'
     | '/_app/solicitudes/nueva'
+    | '/_app/admin/'
     | '/_app/recibos/'
     | '/_app/solicitudes/'
+    | '/_app/admin/creditos/$id'
+    | '/_app/admin/creditos/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -315,6 +361,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin': {
+      id: '/_app/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AppAdminRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/solicitudes/': {
       id: '/_app/solicitudes/'
       path: '/solicitudes'
@@ -328,6 +381,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/recibos/'
       preLoaderRoute: typeof AppRecibosIndexRouteImport
       parentRoute: typeof AppRecibosRoute
+    }
+    '/_app/admin/': {
+      id: '/_app/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AppAdminIndexRouteImport
+      parentRoute: typeof AppAdminRoute
     }
     '/_app/solicitudes/nueva': {
       id: '/_app/solicitudes/nueva'
@@ -392,8 +452,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesNuevoRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/creditos/': {
+      id: '/_app/admin/creditos/'
+      path: '/creditos'
+      fullPath: '/admin/creditos/'
+      preLoaderRoute: typeof AppAdminCreditosIndexRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/creditos/$id': {
+      id: '/_app/admin/creditos/$id'
+      path: '/creditos/$id'
+      fullPath: '/admin/creditos/$id'
+      preLoaderRoute: typeof AppAdminCreditosIdRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
   }
 }
+
+interface AppAdminRouteChildren {
+  AppAdminIndexRoute: typeof AppAdminIndexRoute
+  AppAdminCreditosIdRoute: typeof AppAdminCreditosIdRoute
+  AppAdminCreditosIndexRoute: typeof AppAdminCreditosIndexRoute
+}
+
+const AppAdminRouteChildren: AppAdminRouteChildren = {
+  AppAdminIndexRoute: AppAdminIndexRoute,
+  AppAdminCreditosIdRoute: AppAdminCreditosIdRoute,
+  AppAdminCreditosIndexRoute: AppAdminCreditosIndexRoute,
+}
+
+const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(
+  AppAdminRouteChildren,
+)
 
 interface AppRecibosRouteChildren {
   AppRecibosCargarUbicacionRoute: typeof AppRecibosCargarUbicacionRoute
@@ -420,6 +510,7 @@ const AppRecibosRouteWithChildren = AppRecibosRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppAdminRoute: typeof AppAdminRouteWithChildren
   AppDashboardRoute: typeof AppDashboardRoute
   AppPerfilRoute: typeof AppPerfilRoute
   AppPreciosRoute: typeof AppPreciosRoute
@@ -431,6 +522,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAdminRoute: AppAdminRouteWithChildren,
   AppDashboardRoute: AppDashboardRoute,
   AppPerfilRoute: AppPerfilRoute,
   AppPreciosRoute: AppPreciosRoute,

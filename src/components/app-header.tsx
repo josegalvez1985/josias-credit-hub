@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, FileText, FilePlus, Receipt, Tag, User, Moon, Sun, LogOut } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { useAuth } from "@/lib/auth";
+import { AdminMenu } from "@/components/admin-menu";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -49,6 +50,11 @@ export function AppHeader() {
               </Link>
             );
           })}
+
+          {/* Módulo administrativo (ERP). Se dibuja solo para los usuarios
+              habilitados y en pantalla grande; en el celular no aparece, por eso
+              no tiene equivalente en bottom-nav.tsx. Ver src/lib/permisos.ts. */}
+          <AdminMenu />
         </nav>
 
         <div className="flex items-center gap-1.5">
