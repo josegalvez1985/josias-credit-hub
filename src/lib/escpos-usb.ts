@@ -6,11 +6,19 @@
 //
 // ⚠ Windows: cuando se conecta una térmica USB, Windows la reclama con su
 // driver de impresión (`usbprint.sys`) y Chrome no puede tomar una interfaz que
-// otro driver ya reclamó — `claimInterface()` falla con "Access denied". Se
-// sortea reemplazando el driver por WinUSB con Zadig (https://zadig.akeo.ie/),
-// pero entonces esa impresora deja de existir como impresora de Windows para
-// cualquier otro programa. En Android/Linux normalmente anda sin tocar nada.
-// El detalle completo está en GUIA-IMPRESION-APEX-USB.md §1 y §5.
+// otro driver ya reclamó — `claimInterface()` falla con "Access denied".
+//
+// Hay dos salidas, y la primera es la que conviene:
+//
+//   1. `recibo-sistema.ts` — imprime por el driver que Windows YA tiene, con el
+//      diálogo de impresión. No hay que configurar nada. Es lo que ofrece el
+//      mensaje de error de `traducirError()`.
+//   2. Reemplazar el driver por WinUSB con Zadig (https://zadig.akeo.ie/), que
+//      habilita este archivo pero deja la impresora inutilizable para el resto
+//      del sistema y pide permisos de administrador.
+//
+// En Android/Linux normalmente anda sin tocar nada.
+// El detalle completo está en GUIA-IMPRESION-USB.md.
 //
 // Como Web Bluetooth, WebUSB exige contexto seguro (HTTPS o localhost) y un
 // gesto del usuario para abrir el selector de dispositivos. En iOS no existe.
@@ -73,8 +81,13 @@ function traducirError(e: unknown): Error {
   const msg = e instanceof Error ? e.message : String(e);
 
   if (/access denied|unable to claim/i.test(msg)) {
+    // Este es EL error de Windows con las térmicas USB. Antes el mensaje
+    // mandaba a cambiar el driver con Zadig, que pide administrador y deja la
+    // impresora inservible para el resto del sistema. Ahora se ofrece la vía
+    // que no configura nada: imprimir por el driver que Windows ya tiene
+    // instalado (botón "Imprimir por Windows" → recibo-sistema.ts).
     return new Error(
-      "Windows tiene tomada la impresora con su propio driver. Hay que cambiarlo por WinUSB con Zadig (ver GUIA-IMPRESION-APEX-USB.md), o usar la impresión Bluetooth.",
+      "Windows tiene tomada la impresora con su propio driver. Usá el botón «Imprimir por Windows», que la usa tal cual está.",
     );
   }
   if (/no device selected|cancel/i.test(msg)) {

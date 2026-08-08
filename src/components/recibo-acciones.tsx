@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Printer, Copy, MessageCircle, Loader2, Send, Check, Usb, Bluetooth } from "lucide-react";
 import { imprimirRecibo, soportaImpresion, type DatosTicket } from "@/lib/escpos";
 import { imprimirReciboUsb, olvidarImpresoraUsb, soportaImpresionUsb } from "@/lib/escpos-usb";
+import { imprimirReciboSistema } from "@/lib/recibo-sistema";
 import type { ReciboDetalle } from "@/lib/api";
 import {
   abrirWhatsApp,
@@ -79,6 +80,17 @@ export function ReciboAcciones({
       if (msg !== "cancelado") toast.error(msg);
     } finally {
       setImprimiendoUsb(null);
+    }
+  }
+
+  // Imprime por el driver que el sistema ya tiene instalado. Es la vía que no
+  // necesita configurar nada: sirve cuando WebUSB falla con "Access denied"
+  // porque Windows tiene la impresora tomada con `usbprint.sys`.
+  function imprimirPorSistema(tipo: "ORIGINAL" | "DUPLICADO") {
+    try {
+      imprimirReciboSistema(datos, tipo);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al abrir la impresión");
     }
   }
 
@@ -184,6 +196,37 @@ export function ReciboAcciones({
           </button>
         </div>
       )}
+
+      {/* Impresión por el driver del sistema. Es la salida al error "Windows
+          tiene tomada la impresora": usa la impresora tal como está instalada,
+          sin Zadig ni permisos de administrador. Se muestra siempre, porque es
+          la única vía que funciona en una PC de escritorio sin configurar nada. */}
+      <div className="space-y-1.5">
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Printer className="h-3.5 w-3.5" /> Impresora instalada en Windows
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => imprimirPorSistema("ORIGINAL")}
+            className="flex-1"
+          >
+            <Printer className="h-4 w-4" /> Original
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => imprimirPorSistema("DUPLICADO")}
+            className="flex-1"
+          >
+            <Copy className="h-4 w-4" /> Duplicado
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Si la impresora USB da error, usá estos botones: no hay que configurar nada.
+        </p>
+      </div>
 
       {!puedeImprimir && (
         <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
