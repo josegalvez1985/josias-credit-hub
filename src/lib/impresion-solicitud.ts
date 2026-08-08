@@ -11,7 +11,10 @@
 // secciones y en el mismo orden. Si allá cambia, hay que replicarlo acá.
 //
 //   Hoja      216 × 330 mm  (OFICIO, no A4 — así está en la página 57)
-//   Márgenes  12 mm
+//   Márgenes  12 mm — con @page en margen CERO y el margen dibujado por el
+//             contenido, para que se imprima sin tocar el diálogo. Los
+//             laterales salen del padding de .hoja; los de arriba y abajo, del
+//             thead/tfoot de .marco, que el navegador repite en cada página.
 //   Tipos     Helvetica; labels 7.5pt bold, valores 9pt
 //   Columnas  3, a 0 / 64 / 128 mm del margen izquierdo
 
@@ -141,23 +144,27 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
 <style>
   /* Hoja oficio, igual que el jsPDF de APEX: format [216, 330] en mm.
 
-     A diferencia del pagaré, acá el margen va en @page y NO en un padding:
-     este impreso es multi-página y un padding solo haría margen en la primera
-     y la última hoja, dejando las del medio pegadas al borde. @page es lo
-     único que aplica a todas.
+     Margen en CERO, igual que el pagaré: si @page declara un margen, el
+     navegador lo trata como su opción "Predeterminado" y lo recalcula según la
+     impresora, así que el usuario tiene que corregirlo a mano. Con margin:0 no
+     queda nada que ajustar y se imprime directo, sin tocar el diálogo.
 
-     Declarar el margen explícito también evita que el usuario tenga que
-     configurar nada: al haber un valor, el diálogo arranca en "Predeterminado"
-     y respeta estos 12mm. */
-  @page { size: 216mm 330mm; margin: 12mm; }
+     El margen del papel lo dibuja el contenido, que el navegador no toca. Como
+     este impreso es multi-página, NO alcanza con un padding en .hoja (solo
+     haría margen en la primera y la última hoja): los 12mm laterales salen del
+     padding y los de arriba y abajo de .marco, que se repite en cada página.
+     Ver el comentario de .marco más abajo. */
+  @page { size: 216mm 330mm; margin: 0; }
 
   /* Sin esto el padding se SUMA al alto y el contenido se pasa de la página:
      306mm de min-height + 12mm de padding arriba y abajo = 330mm de caja
      contra 306mm útiles, y el sobrante caía en una hoja de más. */
   *, *::before, *::after { box-sizing: border-box; }
 
-  /* En pantalla se simula la hoja para que la vista previa se parezca al
-     papel; al imprimir, @page ya pone el margen y esto se neutraliza. */
+  /* En pantalla se simula la hoja completa (216x330mm con sus 12mm de margen
+     dibujados por el padding) para ver lo mismo que sale en papel. Al imprimir
+     solo se conserva el padding lateral: el vertical lo pone .marco en cada
+     página. */
   body {
     margin: 0;
     background: #f3f4f6;
@@ -175,17 +182,29 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
   }
   @media print {
     body { background: #fff; }
-    /* Al imprimir, el margen lo pone @page: la hoja ocupa el área útil y no
-       agrega padding propio, o se descontaría dos veces.
+    /* Se CONSERVA el padding lateral de 12mm: con @page en margen cero, ese
+       padding es el único margen izquierdo/derecho. Solo se saca lo que es de
+       pantalla (el margen exterior gris y la sombra).
        El min-height en 0 es imprescindible acá: este impreso puede pasar de una
        página (las tablas crecen con los datos) y un alto mínimo de hoja entera
        empuja el contenido fuera del área útil en cada salto. */
-    .hoja { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+    .hoja { min-height: 0; margin: 0; padding: 0 12mm; box-shadow: none; }
     .noprint { display: none !important; }
 
-    /* Que ninguna tabla parta una fila al medio ni deje el encabezado solo al
-       pie de una página. El thead se repite arriba de cada página sola. */
-    tr    { break-inside: avoid; }
+    /* El margen de ARRIBA y ABAJO de cada página. Un padding no sirve para
+       esto en un documento multi-página: solo separa la primera y la última
+       hoja, y las del medio salen pegadas al borde. La única construcción que
+       el navegador repite en TODAS las páginas es el thead/tfoot de una tabla,
+       así que el contenido va dentro de .marco (una <table>) y estas dos celdas
+       vacías de 12mm reservan el margen en cada hoja. */
+    .marco { width: 100%; border-collapse: collapse; }
+    .marco-top, .marco-bot { height: 12mm; border: 0; }
+
+    /* Que ninguna tabla de datos parta una fila al medio ni deje el encabezado
+       solo al pie de una página. El thead se repite arriba de cada página sola.
+       Se excluye .marco: su única fila contiene el documento entero, y un
+       break-inside:avoid ahí impediría todo salto de página. */
+    table:not(.marco) tr { break-inside: avoid; }
     thead { display: table-header-group; }
     tfoot { display: table-footer-group; }
 
@@ -222,6 +241,16 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
   .vacio { text-align: center; color: #666; font-style: italic; padding: 3mm; }
 
   .lab.sep { border-top: .1mm solid #ccc; padding-top: 3mm; margin-top: 3mm; }
+
+  /* El marco es estructura, no una tabla de datos: hay que anular los estilos
+     de arriba (padding, bordes y el fondo gris de tfoot td) o se verían como
+     celdas. Va después de las reglas de tabla para ganar por orden. */
+  .marco { font-size: inherit; }
+  .marco > thead > tr > td,
+  .marco > tfoot > tr > td,
+  .marco > tbody > tr > td {
+    padding: 0; border: 0; background: none; font-weight: normal; text-align: left;
+  }
 
   /* Firmas: dos líneas al pie, como en el PDF de APEX. Se evita que queden
      partidas entre dos páginas. */
@@ -261,6 +290,14 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
 </div>
 
 <div class="hoja">
+<!-- El contenido va dentro de una tabla para poder reservar el margen de
+     arriba y abajo en CADA página impresa (ver .marco en el CSS). En pantalla
+     la tabla es transparente: no dibuja nada y ocupa todo el ancho. -->
+<table class="marco">
+  <thead><tr><td class="marco-top"></td></tr></thead>
+  <tfoot><tr><td class="marco-bot"></td></tr></tfoot>
+  <tbody><tr><td>
+
   <div class="head">
     ${logoUrl ? `<img src="${esc(logoUrl)}" alt="">` : ""}
     <div class="tit">
@@ -343,6 +380,9 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
   <div class="pie">
     <span>Generado: ${esc(new Date().toLocaleString("es-PY"))}</span>
   </div>
+
+  </td></tr></tbody>
+</table>
 </div>
 
 </body>
