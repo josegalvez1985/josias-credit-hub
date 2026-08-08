@@ -139,8 +139,15 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
 <meta charset="utf-8">
 <title>${esc(titulo)}</title>
 <style>
-  /* Hoja oficio, igual que el jsPDF de APEX: format [216, 330] en mm. */
+  /* Hoja oficio, igual que el jsPDF de APEX: format [216, 330] en mm.
+     ⚠ El navegador solo respeta este tamaño si en el diálogo de impresión el
+     papel está en "Oficio"/"Legal"; en A4 recorta el pie. La barra lo avisa. */
   @page { size: 216mm 330mm; margin: 12mm; }
+
+  /* Sin esto el padding se SUMA al alto y el contenido se pasa de la página:
+     306mm de min-height + 12mm de padding arriba y abajo = 330mm de caja
+     contra 306mm útiles, y el sobrante caía en una hoja de más. */
+  *, *::before, *::after { box-sizing: border-box; }
 
   /* En pantalla se simula la hoja para que la vista previa se parezca al
      papel; al imprimir, @page ya pone el margen y esto se neutraliza. */
@@ -152,8 +159,8 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
     color: #000;
   }
   .hoja {
-    width: 192mm;              /* 216 - 12*2 de márgenes */
-    min-height: 306mm;
+    width: 216mm;              /* la hoja entera; el padding hace de margen */
+    min-height: 330mm;
     margin: 8mm auto;
     padding: 12mm;
     background: #fff;
@@ -161,8 +168,22 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
   }
   @media print {
     body { background: #fff; }
+    /* Al imprimir, el margen lo pone @page: la hoja ocupa el área útil y no
+       agrega padding propio, o se descontaría dos veces.
+       El min-height en 0 es imprescindible acá: este impreso puede pasar de una
+       página (las tablas crecen con los datos) y un alto mínimo de hoja entera
+       empuja el contenido fuera del área útil en cada salto. */
     .hoja { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
     .noprint { display: none !important; }
+
+    /* Que ninguna tabla parta una fila al medio ni deje el encabezado solo al
+       pie de una página. El thead se repite arriba de cada página sola. */
+    tr    { break-inside: avoid; }
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+
+    /* Un título no puede quedar como última línea de la página. */
+    h2 { break-after: avoid; }
   }
 
   /* Encabezado */
@@ -208,9 +229,13 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
   /* Barra de acciones — solo en pantalla */
   .barra {
     position: sticky; top: 0; z-index: 10;
-    display: flex; gap: 8px; justify-content: center;
+    display: flex; gap: 8px; justify-content: center; align-items: center;
+    flex-wrap: wrap;
     padding: 10px; background: #fff; border-bottom: 1px solid #e5e7eb;
   }
+  /* Recordatorio de la configuración del diálogo de impresión: el navegador
+     no aplica el tamaño oficio solo, hay que elegirlo ahí. */
+  .barra-nota { font-size: 12px; color: #57534e; }
   .barra button {
     font: inherit; font-size: 13px; padding: 8px 16px; border-radius: 999px;
     border: 1px solid #d1d5db; background: #fff; cursor: pointer;
@@ -223,6 +248,10 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
 <div class="barra noprint">
   <button class="primario" onclick="window.print()">Imprimir / Guardar PDF</button>
   <button onclick="window.close()">Cerrar</button>
+  <span class="barra-nota">
+    Papel: <strong>Oficio (216 × 330 mm)</strong> · Márgenes: <strong>Predeterminados</strong> ·
+    Escala: <strong>100 %</strong>
+  </span>
 </div>
 
 <div class="hoja">

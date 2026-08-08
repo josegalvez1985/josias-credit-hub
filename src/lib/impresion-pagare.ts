@@ -3,10 +3,10 @@
 // Réplica del formulario preimpreso que hoy se llena a mano en Josias Muebles.
 // Son DOS bloques en UNA hoja, en este orden:
 //
-//   1. PAGARÉ A LA ORDEN                        — monto, vencimiento, texto
-//      legal + dos pares de firmas (deudor y codeudor)
-//   2. AUTORIZACIÓN DE INCLUSIÓN DE MOROSIDAD  — texto legal (Ley 6534/20)
-//      + otros dos pares de firmas
+//   1. AUTORIZACIÓN DE INCLUSIÓN DE MOROSIDAD  — texto legal (Ley 6534/20)
+//      + dos pares de firmas (deudor y codeudor)
+//   2. PAGARÉ A LA ORDEN                        — monto, vencimiento, texto
+//      legal + otros dos pares de firmas
 //
 // Decisiones tomadas con Jose (2026-08-06):
 //   - UN solo pagaré por crédito, por el TOTAL (no uno por cuota).
@@ -17,6 +17,10 @@
 //     usa el recibo térmico.
 //   - Los datos del codeudor (nombre, domicilio, cédula) van SIEMPRE EN BLANCO:
 //     VENTAS_REFERENCIAS no guarda domicilio ni cédula del garante.
+//   - (2026-08-08) El bloque del pagaré se llena A MANO al firmarlo: salen en
+//     blanco "Vencimiento:", "El día __ de ______", "Pagaré a: ______" y la
+//     fecha de emisión de "Capiatá __ de ______ de 20__". Del crédito solo se
+//     imprimen el monto, el N° y el % de interés.
 //
 // Igual que el impreso de la solicitud: HTML + window.print() en pestaña
 // nueva, sin dependencias. Ver src/lib/impresion-solicitud.ts.
@@ -45,31 +49,6 @@ function gs(n: unknown): string {
   return new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(num);
 }
 
-// Descompone YYYY-MM-DD en día / mes en palabra / año, porque el formulario
-// dice "Capiatá ____ de ______ de 20__" y "El día ____ de ______".
-const MESES = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
-
-function partesFecha(d?: string): { dia: string; mes: string; anio: string } {
-  const m = d?.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return { dia: "", mes: "", anio: "" };
-  return {
-    dia: String(Number(m[3])),
-    mes: MESES[Number(m[2]) - 1] ?? "",
-    // El formulario ya trae impreso "de 20__", así que solo van los dos
-    // últimos dígitos del año.
-    anio: m[1].slice(2),
-  };
-}
-
-function fechaCorta(d?: string): { dd: string; mm: string; aaaa: string } {
-  const m = d?.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return { dd: "", mm: "", aaaa: "" };
-  return { dd: m[3], mm: m[2], aaaa: m[1] };
-}
-
 // Un campo con línea de puntos. `valor` vacío deja la línea para llenar a mano.
 function campo(label: string, valor: unknown, ancho = "auto"): string {
   return `<span class="campo" style="--w:${ancho}">
@@ -95,13 +74,6 @@ function firmas(nombre = "", domicilio = "", cedula = ""): string {
 }
 
 function construirHtml(c: CreditoCabecera): string {
-  const emision = partesFecha(c.fecha_factura);
-  const venc = fechaCorta(c.fec_vencimiento_inicial);
-  // El vencimiento aparece dos veces y con formatos distintos: como
-  // dd/mm/aaaa en la línea "Vencimiento:", y con el mes en palabra en
-  // "El día __ de ______".
-  const vencLargo = partesFecha(c.fec_vencimiento_inicial);
-
   // Domicilio del titular: dirección + nro de casa + ciudad, lo que haya.
   const domicilio = [c.direccion, c.nro_casa ? `N° ${c.nro_casa}` : null, c.ciudad_cliente]
     .filter(Boolean)
@@ -116,23 +88,35 @@ function construirHtml(c: CreditoCabecera): string {
 <meta charset="utf-8">
 <title>Pagaré ${esc(c.nro_solicitud ?? c.id)}</title>
 <style>
-  /* Misma hoja oficio que el impreso de la solicitud. Los dos bloques
-     (morosidad + pagaré) entran en una sola página, como el formulario
-     preimpreso que se usa hoy. */
+  /* Hoja oficio (216 x 330 mm), igual que el impreso de la solicitud. Los dos
+     bloques (morosidad + pagaré) entran en UNA sola página.
+
+     ⚠ El tamaño es una sugerencia: el navegador lo aplica solo si en el diálogo
+     de impresión el papel está en "Oficio"/"Legal". Si queda en A4 (297mm,
+     33mm menos) recorta el pie o reescala. Por eso la barra lo avisa. */
   @page { size: 216mm 330mm; margin: 10mm; }
+
+  /* Sin esto el padding se SUMA al alto y el contenido se pasa de la página:
+     310mm de min-height + 10mm de padding arriba y abajo = 330mm de caja
+     contra 310mm útiles, y el sobrante caía en una segunda hoja. */
+  *, *::before, *::after { box-sizing: border-box; }
 
   body {
     margin: 0; background: #f3f4f6;
     font-family: Helvetica, Arial, sans-serif;
     font-size: 8.5pt; color: #000; line-height: 1.35;
   }
+  /* En pantalla se simula la hoja completa: 330mm de alto con sus márgenes
+     dibujados por el padding, para ver en la web lo mismo que sale en papel. */
   .hoja {
-    width: 196mm; min-height: 310mm;
+    width: 216mm; min-height: 330mm;
     margin: 8mm auto; padding: 10mm;
     background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.25);
   }
   @media print {
     body { background: #fff; }
+    /* Al imprimir, el margen lo pone @page: la hoja ocupa el área útil y no
+       agrega padding propio, o se descontaría dos veces. */
     .hoja { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
     .noprint { display: none !important; }
   }
@@ -177,20 +161,30 @@ function construirHtml(c: CreditoCabecera): string {
     padding: 1mm 0; margin-bottom: 2mm; font-size: 9pt;
   }
 
-  /* El pagaré va PRIMERO y la autorización debajo. Se ordena con flex en vez
-     de reacomodar el HTML para que cada bloque siga junto a su comentario y
-     sea fácil compararlo con las fotos del formulario. */
+  /* La autorización de morosidad va PRIMERO y el pagaré debajo. Se ordena con
+     flex en vez de reacomodar el HTML para que cada bloque siga junto a su
+     comentario y sea fácil compararlo con las fotos del formulario. */
   .hoja { display: flex; flex-direction: column; }
-  #bloque-pagare    { order: 1; }
-  #bloque-morosidad { order: 2; margin-top: 10mm; }
+  #bloque-morosidad { order: 1; }
+  /* Separación entre los dos bloques: da aire para doblar o cortar la hoja
+     entre la autorización y el pagaré. */
+  #bloque-pagare    { order: 2; margin-top: 20mm; }
+
+  /* Ningún bloque puede partirse al medio: si algún día el texto crece y ya no
+     entra, que pase entero a la hoja siguiente en vez de cortar las firmas. */
+  .bloque { break-inside: avoid; }
   .fila { margin-bottom: 3.5mm; }
   .derecha { text-align: right; }
 
   .barra {
     position: sticky; top: 0; z-index: 10;
-    display: flex; gap: 8px; justify-content: center;
+    display: flex; gap: 8px; justify-content: center; align-items: center;
+    flex-wrap: wrap;
     padding: 10px; background: #fff; border-bottom: 1px solid #e5e7eb;
   }
+  /* Recordatorio de la configuración del diálogo de impresión: el navegador
+     no aplica el tamaño oficio solo, hay que elegirlo ahí. */
+  .barra-nota { font-size: 12px; color: #57534e; }
   .barra button {
     font: inherit; font-size: 13px; padding: 8px 16px; border-radius: 999px;
     border: 1px solid #d1d5db; background: #fff; cursor: pointer;
@@ -211,6 +205,10 @@ function construirHtml(c: CreditoCabecera): string {
 <div class="barra noprint">
   <button class="primario" onclick="window.print()">Imprimir / Guardar PDF</button>
   <button onclick="window.close()">Cerrar</button>
+  <span class="barra-nota">
+    Papel: <strong>Oficio (216 × 330 mm)</strong> · Márgenes: <strong>Predeterminados</strong> ·
+    Escala: <strong>100 %</strong>
+  </span>
 </div>
 
 ${
@@ -226,7 +224,7 @@ ${
 
 <div class="hoja">
 
-  <!-- ============ BLOQUE 2: AUTORIZACIÓN DE MOROSIDAD ============ -->
+  <!-- ============ BLOQUE 1: AUTORIZACIÓN DE MOROSIDAD ============ -->
   <div class="bloque" id="bloque-morosidad">
     <h1>AUTORIZACIÓN DE INCLUSIÓN DE MOROSIDAD</h1>
 
@@ -253,7 +251,7 @@ ${
     ${firmas(titular, domicilio, c.documento ?? "")}
   </div>
 
-  <!-- ============ BLOQUE 1: PAGARÉ A LA ORDEN ============ -->
+  <!-- ============ BLOQUE 2: PAGARÉ A LA ORDEN ============ -->
   <div class="bloque" id="bloque-pagare">
     <div class="fila" style="text-align:center">
       <h2>PAGARÉ A LA ORDEN</h2>
@@ -268,25 +266,25 @@ ${
     <div class="fila">
       <span class="campo">
         <span class="lbl">Vencimiento:</span>
-        <span class="lin" style="min-width:12mm">${esc(venc.dd)}</span>/<span
-          class="lin" style="min-width:12mm">${esc(venc.mm)}</span>/<span
-          class="lin" style="min-width:18mm">${esc(venc.aaaa)}</span>
+        <span class="lin" style="min-width:12mm"></span>/<span
+          class="lin" style="min-width:12mm"></span>/<span
+          class="lin" style="min-width:18mm"></span>
       </span>
       <span style="float:right">
         ${esc(CIUDAD_EMISION)}
-        <span class="lin" style="min-width:16mm">${esc(emision.dia)}</span> de
-        <span class="lin" style="min-width:28mm">${esc(emision.mes)}</span> de 20<span
-          class="lin" style="min-width:12mm">${esc(emision.anio)}</span>
+        <span class="lin" style="min-width:16mm"></span> de
+        <span class="lin" style="min-width:28mm"></span> de 20<span
+          class="lin" style="min-width:12mm"></span>
       </span>
     </div>
 
     <div class="fila" style="clear:both">
-      El día <span class="lin" style="min-width:16mm">${esc(venc.dd)}</span>
-      de <span class="lin" style="min-width:60mm">${esc(vencLargo.mes)} de ${esc(c.fec_vencimiento_inicial?.slice(0, 4) ?? "")}</span>
+      El día <span class="lin" style="min-width:16mm"></span>
+      de <span class="lin" style="min-width:60mm"></span>
     </div>
 
     <div class="fila">
-      Pagaré a: <span class="lin" style="min-width:130mm">${esc(EMPRESA)}</span>
+      Pagaré a: <span class="lin" style="min-width:130mm"></span>
       o a su orden la cantidad
     </div>
 
