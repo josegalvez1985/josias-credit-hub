@@ -140,8 +140,15 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
 <title>${esc(titulo)}</title>
 <style>
   /* Hoja oficio, igual que el jsPDF de APEX: format [216, 330] en mm.
-     ⚠ El navegador solo respeta este tamaño si en el diálogo de impresión el
-     papel está en "Oficio"/"Legal"; en A4 recorta el pie. La barra lo avisa. */
+
+     A diferencia del pagaré, acá el margen va en @page y NO en un padding:
+     este impreso es multi-página y un padding solo haría margen en la primera
+     y la última hoja, dejando las del medio pegadas al borde. @page es lo
+     único que aplica a todas.
+
+     Declarar el margen explícito también evita que el usuario tenga que
+     configurar nada: al haber un valor, el diálogo arranca en "Predeterminado"
+     y respeta estos 12mm. */
   @page { size: 216mm 330mm; margin: 12mm; }
 
   /* Sin esto el padding se SUMA al alto y el contenido se pasa de la página:
@@ -249,8 +256,7 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
   <button class="primario" onclick="window.print()">Imprimir / Guardar PDF</button>
   <button onclick="window.close()">Cerrar</button>
   <span class="barra-nota">
-    Papel: <strong>Oficio (216 × 330 mm)</strong> · Márgenes: <strong>Predeterminados</strong> ·
-    Escala: <strong>100 %</strong>
+    Hoja oficio (216 × 330 mm). Imprimí directamente, sin cambiar nada.
   </span>
 </div>
 

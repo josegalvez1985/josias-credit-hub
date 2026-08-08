@@ -91,14 +91,16 @@ function construirHtml(c: CreditoCabecera): string {
   /* Hoja oficio (216 x 330 mm), igual que el impreso de la solicitud. Los dos
      bloques (morosidad + pagaré) entran en UNA sola página.
 
-     ⚠ El tamaño es una sugerencia: el navegador lo aplica solo si en el diálogo
-     de impresión el papel está en "Oficio"/"Legal". Si queda en A4 (297mm,
-     33mm menos) recorta el pie o reescala. Por eso la barra lo avisa. */
-  @page { size: 216mm 330mm; margin: 10mm; }
+     El margen va en CERO a propósito. Si se le da un valor, el navegador suma
+     encima su propio margen configurable y el usuario tiene que corregirlo a
+     mano en el diálogo. Con margin:0 no queda nada que ajustar: el margen del
+     papel lo dibuja el padding de .hoja, que es contenido y el navegador no
+     toca. Así se imprime sin configurar nada. */
+  @page { size: 216mm 330mm; margin: 0; }
 
-  /* Sin esto el padding se SUMA al alto y el contenido se pasa de la página:
-     310mm de min-height + 10mm de padding arriba y abajo = 330mm de caja
-     contra 310mm útiles, y el sobrante caía en una segunda hoja. */
+  /* Imprescindible: hace que el padding de 10mm quede DENTRO de los 216x330mm
+     de .hoja. Sin esto se sumaría al alto (330 + 10 + 10 = 350mm de caja
+     contra 330mm de papel) y el sobrante caería en una segunda hoja. */
   *, *::before, *::after { box-sizing: border-box; }
 
   body {
@@ -115,9 +117,10 @@ function construirHtml(c: CreditoCabecera): string {
   }
   @media print {
     body { background: #fff; }
-    /* Al imprimir, el margen lo pone @page: la hoja ocupa el área útil y no
-       agrega padding propio, o se descontaría dos veces. */
-    .hoja { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+    /* Se CONSERVA el padding de 10mm: con @page en margen cero, ese padding es
+       el único margen del impreso. Solo se saca lo que es de pantalla (el
+       margen exterior gris y la sombra). */
+    .hoja { margin: 0; box-shadow: none; }
     .noprint { display: none !important; }
   }
 
@@ -206,8 +209,7 @@ function construirHtml(c: CreditoCabecera): string {
   <button class="primario" onclick="window.print()">Imprimir / Guardar PDF</button>
   <button onclick="window.close()">Cerrar</button>
   <span class="barra-nota">
-    Papel: <strong>Oficio (216 × 330 mm)</strong> · Márgenes: <strong>Predeterminados</strong> ·
-    Escala: <strong>100 %</strong>
+    Hoja oficio (216 × 330 mm). Imprimí directamente, sin cambiar nada.
   </span>
 </div>
 
