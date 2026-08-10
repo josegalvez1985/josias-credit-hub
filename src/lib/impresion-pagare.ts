@@ -346,4 +346,18 @@ export function imprimirPagare(c: CreditoCabecera): void {
   }
   win.document.write(construirHtml(c));
   win.document.close();
+
+  // Igual que la solicitud: el diálogo se abre solo y al usuario solo le queda
+  // confirmar. Este impreso no carga imágenes, así que el `load` resuelve
+  // enseguida. Ver `autoImprimir` en src/lib/impresion-solicitud.ts.
+  let disparado = false;
+  const imprimir = () => {
+    if (disparado) return;
+    disparado = true;
+    win.focus();
+    win.print();
+  };
+
+  if (win.document.readyState === "complete") imprimir();
+  else win.addEventListener("load", imprimir, { once: true });
 }

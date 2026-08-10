@@ -194,7 +194,11 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
 
   /* Encabezado */
   .head { display: flex; align-items: flex-start; gap: 4mm; }
-  .head img { width: 20mm; height: 20mm; object-fit: contain; }
+  /* El hueco del logo se reserva con el contenedor y no con el <img>, así el
+     encabezado mide lo mismo esté la imagen cargada o no. Sin esto, una hoja
+     impresa antes de que baje el logo queda con el título corrido. */
+  .head .logo { width: 20mm; height: 20mm; flex: 0 0 20mm; }
+  .head img { width: 100%; height: 100%; object-fit: contain; }
   .head .tit { flex: 1; }
   .head h1 { margin: 0; font-size: 15pt; }
   .head .sub { font-size: 9pt; margin-top: 1mm; }
@@ -261,7 +265,7 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
 
 <div class="hoja">
   <div class="head">
-    ${logoUrl ? `<img src="${esc(logoUrl)}" alt="">` : ""}
+    <div class="logo">${logoUrl ? `<img src="${esc(logoUrl)}" alt="">` : ""}</div>
     <div class="tit">
       <h1>JOSIAS MUEBLES</h1>
       <div class="sub">Solicitud de Venta a Crédito</div>
@@ -367,4 +371,33 @@ export function imprimirSolicitud(d: DatosSolicitud): void {
   }
   win.document.write(construirHtml(d, logoUrl));
   win.document.close();
+
+  // El diálogo se dispara solo: el usuario aprieta el botón de la app y lo
+  // único que le queda por hacer es confirmar.
+  //
+  // Va en el `load` y no en un `setTimeout` porque este impreso trae el logo
+  // (~950 KB) por red: imprimir antes de que la imagen esté decodificada saca
+  // la hoja con el hueco en blanco. `load` espera justamente a las imágenes.
+  // El pagaré no tiene esa espera porque no carga ninguna.
+  autoImprimir(win);
+}
+
+// Dispara el diálogo de impresión una sola vez, cuando la pestaña terminó de
+// cargar (incluidas las imágenes).
+//
+// El `load` puede haber pasado ya —document.write sobre una pestaña en blanco
+// a veces resuelve antes de que se enganche el listener—, así que se mira
+// primero el readyState. La bandera evita que salgan dos diálogos si entran
+// las dos vías.
+function autoImprimir(win: Window): void {
+  let disparado = false;
+  const imprimir = () => {
+    if (disparado) return;
+    disparado = true;
+    win.focus();
+    win.print();
+  };
+
+  if (win.document.readyState === "complete") imprimir();
+  else win.addEventListener("load", imprimir, { once: true });
 }
