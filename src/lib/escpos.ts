@@ -186,13 +186,18 @@ export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
   // último no se logró mover el papel de forma reproducible en la GL033.
   //
   // Calibrado contra la GL033 con impresiones reales:
-  //   8 → el ticket sale entero, pero sobran ~3 líneas de rollo por recibo
+  //   8 → el ticket sale entero (valor actual)
   //   5 → el pie queda sobre la barra de corte
   // Ojo al medir: si la impresora viene de una tanda de pruebas fallidas, hay
   // que apagarla y prenderla antes, o el buffer sucio confunde el resultado.
   // Si se cambia de modelo, repetir: subir hasta que el pie salga en el mismo
   // ticket, después bajar hasta que deje de sobrar papel.
-  for (let i = 0; i < 5; i++) t.linea();
+  //
+  // ⚠ Si el recibo sale cortado, fijarse PRIMERO por qué vía se imprimió. El
+  // ticket con "RECIBO ORIGINAL" / "Son:" / "Firma del cobrador" es el HTML de
+  // recibo-sistema.ts (impresión por Windows), no este ESC/POS: ahí el corte lo
+  // causaba el @page con alto "auto" y subir este número no cambia nada.
+  for (let i = 0; i < 8; i++) t.linea();
 
   // Sin `cortar()`: la GL033 no tiene cuchilla y además interpreta GS V como
   // un avance fijo de varios centímetros, que era la mitad del papel que

@@ -26,6 +26,13 @@ import type { DatosTicket, TipoRecibo } from "./escpos";
 // área imprimible real siempre es un poco menor que el papel.
 export type AnchoPapel = 58 | 80;
 
+// Alto de la hoja, en mm. Ver el comentario del @page: con alto "auto" el
+// driver térmico corta el ticket a mitad de camino, así que se declara fijo.
+// 150mm entra un recibo completo con aire de sobra (el de la foto medía ~85mm
+// hasta la firma). Al ser rollo continuo, pasarse solo gasta papel en blanco;
+// quedarse corto vuelve a cortar el contenido, que es el error caro.
+const ALTO_HOJA = 150;
+
 function esc(v: unknown): string {
   if (v == null) return "";
   return String(v)
@@ -53,11 +60,18 @@ function construirHtml(d: DatosTicket, tipo: TipoRecibo, ancho: AnchoPapel): str
 <meta charset="utf-8">
 <title>Recibo ${esc(d.nroRecibo)}</title>
 <style>
-  /* La "hoja" es el rollo: ancho fijo y alto automático, así el driver corta
-     donde termina el ticket en vez de expulsar una página entera.
+  /* Alto FIJO, no "auto".
+     Con "size: ${ancho}mm auto" el driver de la térmica no sabe dónde termina
+     la página: asume un alto propio, imprime hasta ahí y descarta el resto. El
+     síntoma era un ticket que se cortaba después de "Son: ..." —sin el
+     cobrador ni la firma— y que además amontonaba las primeras líneas. Subir
+     el margen inferior no lo arreglaba, porque lo que faltaba nunca llegaba a
+     salir del navegador.
+     Por eso la hoja se declara con una altura concreta y holgada: el rollo es
+     continuo, así que lo que sobra es papel en blanco, no una hoja extra.
      Margen CERO por el mismo motivo que los otros impresos: si @page declara
      un margen, el navegador lo recalcula y el usuario tiene que corregirlo. */
-  @page { size: ${ancho}mm auto; margin: 0; }
+  @page { size: ${ancho}mm ${ALTO_HOJA}mm; margin: 0; }
 
   *, *::before, *::after { box-sizing: border-box; }
 
@@ -93,11 +107,24 @@ function construirHtml(d: DatosTicket, tipo: TipoRecibo, ancho: AnchoPapel): str
 
   .letras { margin-top: 1.5mm; font-size: 8pt; word-break: break-word; }
 
-  .firma { margin-top: 12mm; text-align: center; font-size: 8pt; }
-  .firma .lin { border-top: 1px solid #000; margin: 0 4mm 1mm; }
+  /* Que ninguna sección se parta al medio si el driver decide cortar antes de
+     tiempo. No arregla el corte —para eso está .fin— pero decide DÓNDE cae:
+     mejor que se vaya un bloque entero al papel siguiente y no media línea. */
+  .f, .letras { break-inside: avoid; page-break-inside: avoid; }
 
-  /* Espacio al final para que el corte no se coma la última línea. */
-  .fin { height: 10mm; }
+  /* Espacio en blanco al pie, para cortar el papel sin comerse las últimas
+     líneas. Antes acá iba la firma del cobrador; al sacarla, este colchón toma
+     su lugar y queda todo el tramo libre para el tirón contra la barra.
+
+     Va con min-height (no height) y con líneas en blanco reales adentro: un
+     div vacío al final del body lo puede colapsar el navegador al paginar,
+     y entonces el espacio no se reserva y el corte vuelve a comerse texto.
+     Con contenido adentro, el tramo existe sí o sí.
+
+     40mm ≈ 4cm de rollo. Es a propósito más de lo que hay entre el cabezal y
+     la barra dentada: papel en blanco de sobra es barato, un recibo cortado
+     hay que reimprimirlo. */
+  .fin { min-height: 40mm; break-inside: avoid; page-break-inside: avoid; }
 
   /* Barra de acciones — nunca sale en el papel. */
   .barra {
@@ -145,12 +172,9 @@ ${d.montoLetras ? `<div class="letras">Son: ${esc(d.montoLetras)}</div>` : ""}
 
 ${fila("Cobrador", d.cobrador)}
 
-<div class="firma">
-  <div class="lin"></div>
-  Firma del cobrador
-</div>
-
-<div class="fin"></div>
+<!-- Colchón de corte. Los &nbsp; no son decorativos: obligan al navegador a
+     reservar el alto aunque el bloque quede último en la página. -->
+<div class="fin">&nbsp;<br>&nbsp;<br>&nbsp;<br>&nbsp;<br>&nbsp;<br>&nbsp;</div>
 
 </body>
 </html>`;
