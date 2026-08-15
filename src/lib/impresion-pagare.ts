@@ -13,6 +13,8 @@
 //   - El N° del pagaré es el NRO_SOLICITUD.
 //   - El % de interés sale de PORC_INTERES; el moratorio y la comisión quedan
 //     en blanco para completar a mano (no están en la base).
+//   - (2026-08-15) Si PORC_INTERES es 0 o NULL, el % de interés también sale en
+//     blanco: un "0%" impreso diría que no se devenga interés durante la mora.
 //   - El monto en letras sale de NUM_LETRAS en Oracle, la misma función que
 //     usa el recibo térmico.
 //   - Los datos del codeudor (nombre, domicilio, cédula) van SIEMPRE EN BLANCO:
@@ -80,7 +82,10 @@ function construirHtml(c: CreditoCabecera): string {
     .join(", ");
 
   const titular = c.razon_social ?? c.nombre_fantasia ?? "";
-  const interes = c.porc_interes != null ? String(c.porc_interes) : "";
+  // Un 0 se trata igual que un NULL: la línea sale en blanco para completar a
+  // mano, como el moratorio y la comisión. Imprimir "0%" en un pagaré firmaría
+  // que no se devenga interés durante la mora, que no es lo que se quiere decir.
+  const interes = c.porc_interes ? String(c.porc_interes) : "";
 
   return `<!doctype html>
 <html lang="es">
