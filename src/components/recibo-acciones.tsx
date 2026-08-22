@@ -1,8 +1,19 @@
 import { useState } from "react";
-import { Printer, Copy, MessageCircle, Loader2, Send, Check, Usb, Bluetooth } from "lucide-react";
+import {
+  Printer,
+  Copy,
+  MessageCircle,
+  Loader2,
+  Send,
+  Check,
+  Usb,
+  Bluetooth,
+  FileText,
+} from "lucide-react";
 import { imprimirRecibo, soportaImpresion, type DatosTicket } from "@/lib/escpos";
 import { imprimirReciboUsb, olvidarImpresoraUsb, soportaImpresionUsb } from "@/lib/escpos-usb";
 import { imprimirReciboSistema } from "@/lib/recibo-sistema";
+import { imprimirReciboDocumento } from "@/lib/impresion-recibo";
 import type { ReciboDetalle } from "@/lib/api";
 import {
   abrirWhatsApp,
@@ -45,9 +56,15 @@ export function ticketDesdeRecibo(d: ReciboDetalle): DatosTicket {
 export function ReciboAcciones({
   datos,
   telefono,
+  recibo,
 }: {
   datos: DatosTicket;
   telefono?: string | null;
+  // El recibo completo, para el impreso en hoja. Va aparte de `datos` porque
+  // el documento muestra campos que el ticket térmico no tiene lugar para
+  // imprimir (vencimiento, saldo previo, monto de la cuota). Es opcional: sin
+  // él simplemente no se ofrece esa vía.
+  recibo?: ReciboDetalle;
 }) {
   const [imprimiendo, setImprimiendo] = useState<"ORIGINAL" | "DUPLICADO" | null>(null);
   const [imprimiendoUsb, setImprimiendoUsb] = useState<"ORIGINAL" | "DUPLICADO" | null>(null);
@@ -89,6 +106,17 @@ export function ReciboAcciones({
   function imprimirPorSistema(tipo: "ORIGINAL" | "DUPLICADO") {
     try {
       imprimirReciboSistema(datos, tipo);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al abrir la impresión");
+    }
+  }
+
+  // Abre el recibo como documento en hoja oficio, con el mismo formato que la
+  // solicitud y el pagaré. Desde ahí se imprime o se guarda como PDF.
+  function imprimirDocumento(tipo: "ORIGINAL" | "DUPLICADO") {
+    if (!recibo) return;
+    try {
+      imprimirReciboDocumento(recibo, tipo);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al abrir la impresión");
     }
@@ -227,6 +255,38 @@ export function ReciboAcciones({
           Si la impresora USB da error, usá estos botones: no hay que configurar nada.
         </p>
       </div>
+
+      {/* Recibo en hoja completa, con el mismo formato que la solicitud y el
+          pagaré. Es la vía para la impresora común (no la térmica): en 58mm no
+          entra un formato, por eso el ticket sale como texto corrido. */}
+      {recibo && (
+        <div className="space-y-1.5">
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <FileText className="h-3.5 w-3.5" /> Documento en hoja (imprimir o guardar PDF)
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => imprimirDocumento("ORIGINAL")}
+              className="flex-1"
+            >
+              <FileText className="h-4 w-4" /> Original
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => imprimirDocumento("DUPLICADO")}
+              className="flex-1"
+            >
+              <Copy className="h-4 w-4" /> Duplicado
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Hoja oficio, con logo, tabla y firmas. Para impresora común, no la térmica.
+          </p>
+        </div>
+      )}
 
       {!puedeImprimir && (
         <p className="flex items-start gap-1.5 text-xs text-muted-foreground">

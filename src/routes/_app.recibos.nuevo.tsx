@@ -176,6 +176,7 @@ function NuevoRecibo() {
             <ReciboAcciones
               datos={ticketDesdeRecibo(emitido)}
               telefono={emitido.nro_telefono}
+              recibo={emitido}
             />
           </div>
         </Card>

@@ -388,7 +388,11 @@ function DetalleDialog({ nroRecibo, onClose }: { nroRecibo: number | null; onClo
                 que allá aparecían solo con el recibo ya guardado. */}
             {detalle.anulado !== "S" && (
               <div className="space-y-2 border-t border-border pt-4">
-                <ReciboAcciones datos={ticketDesdeRecibo(detalle)} telefono={detalle.nro_telefono} />
+                <ReciboAcciones
+                  datos={ticketDesdeRecibo(detalle)}
+                  telefono={detalle.nro_telefono}
+                  recibo={detalle}
+                />
               </div>
             )}
           </div>
