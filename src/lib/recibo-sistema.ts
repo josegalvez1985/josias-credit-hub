@@ -28,10 +28,16 @@ export type AnchoPapel = 58 | 80;
 
 // Alto de la hoja, en mm. Ver el comentario del @page: con alto "auto" el
 // driver térmico corta el ticket a mitad de camino, así que se declara fijo.
-// 150mm entra un recibo completo con aire de sobra (el de la foto medía ~85mm
-// hasta la firma). Al ser rollo continuo, pasarse solo gasta papel en blanco;
-// quedarse corto vuelve a cortar el contenido, que es el error caro.
-const ALTO_HOJA = 150;
+// Al ser rollo continuo, pasarse solo gasta papel en blanco; quedarse corto
+// vuelve a cortar el contenido, que es el error caro.
+//
+// Estaba en 150mm cuando el cuerpo era de 9pt (el recibo medía ~85mm). Al subir
+// la letra a 13pt el texto creció ~45%, y con el colchón de 40mm del pie el
+// ticket quedaba rozando el límite: ahí el driver descarta lo que no entra y
+// vuelve el recibo cortado. 220mm deja el mismo aire proporcional que había.
+//
+// ⚠ Si se vuelve a tocar `font-size`, revisar este número.
+const ALTO_HOJA = 220;
 
 function esc(v: unknown): string {
   if (v == null) return "";
@@ -53,6 +59,18 @@ function construirHtml(d: DatosTicket, tipo: TipoRecibo, ancho: AnchoPapel): str
   // 4mm de margen a cada lado: por debajo de eso muchas térmicas cortan el
   // borde, porque el área imprimible es menor que el papel.
   const margen = 4;
+
+  // Cuerpo del importe del TOTAL, calculado para que SIEMPRE entre en un solo
+  // renglón. No es cosmético: con un cuerpo fijo, "Gs.: 370.000" ya desbordaba
+  // en 58mm y el importe se partía en dos líneas.
+  //
+  // La cuenta: Courier avanza 0.6em por caracter, así que el cuerpo máximo en
+  // puntos es (ancho útil en mm) / (caracteres * 0.6 * 0.3528). Se le deja un
+  // 4% de colchón porque el avance real del driver no es exactamente 0.6em, y
+  // se topea a 19pt para que un importe corto no salga descomunal.
+  const importe = "Gs.: " + d.monto;
+  const utilMm = ancho - margen * 2;
+  const cuerpoTotal = Math.min(19, (utilMm * 0.96) / (importe.length * 0.6 * 0.3528));
 
   return `<!doctype html>
 <html lang="es">
@@ -84,18 +102,47 @@ function construirHtml(d: DatosTicket, tipo: TipoRecibo, ancho: AnchoPapel): str
     /* Monoespaciada: el ticket térmico se lee en columnas y así los importes
        quedan alineados, como en el ESC/POS. */
     font-family: "Courier New", monospace;
-    font-size: 9pt;
-    line-height: 1.25;
+    /* 13pt, no 9pt. A 9pt el recibo salía legible pero chico, y el cobrador lo
+       lee de pie y a veces con poca luz.
+       El tope lo pone el ancho del papel, y es más ajustado de lo que parece:
+       Courier avanza 0.6em por caracter, así que en los 50mm útiles (58 menos
+       8 de margen) entran ~18 caracteres a 13pt. NO son las 32 columnas del
+       ESC/POS: la fuente interna de la térmica es mucho más angosta que la
+       Courier del navegador, y por eso los dos recibos se ven parecidos pero
+       no idénticos. La fila más larga ("Interes / Gs.: 6.600") mide 18: subir
+       de 13pt parte las filas "etiqueta / valor" en dos renglones. */
+    font-size: 13pt;
+    line-height: 1.3;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
   .c { text-align: center; }
   .b { font-weight: bold; }
-  .g { font-size: 12pt; font-weight: bold; }
 
-  .emp { font-size: 11pt; font-weight: bold; letter-spacing: .5px; }
-  .tipo { margin-top: 1mm; font-size: 10pt; font-weight: bold; }
+  /* El TOTAL es lo que miran primero el cobrador y el cliente, así que va lo
+     más grande del ticket.
+     NO va como fila "etiqueta / valor" como el resto: a 19pt entran ~12
+     caracteres por línea y "TOTAL" + "Gs.: 220.000" son 17, así que la etiqueta
+     y el importe caían en renglones distintos y quedaba roto. Por eso se apila
+     a propósito: el rótulo chico arriba y el importe grande y centrado abajo,
+     que además es como se lee de un vistazo. */
+  .total { margin: 1mm 0; text-align: center; }
+  .total .rot { font-size: 10pt; letter-spacing: 1px; }
+  /* El cuerpo lo calcula cuerpoTotal (arriba) según lo largo que sea el
+     importe. El nowrap es el cinturón de seguridad: aunque la cuenta se quede
+     corta en una impresora rara, el importe NO se parte en dos renglones.
+     ⚠ Ojo: este bloque vive dentro de un template literal — nada de backticks
+     acá adentro o se corta la cadena. */
+  .total .imp {
+    font-size: ${cuerpoTotal.toFixed(1)}pt;
+    font-weight: bold;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
+  .emp { font-size: 17pt; font-weight: bold; letter-spacing: .5px; }
+  .tipo { margin-top: 1mm; font-size: 15pt; font-weight: bold; }
 
   hr { border: 0; border-top: 1px dashed #000; margin: 2mm 0; }
 
@@ -105,12 +152,15 @@ function construirHtml(d: DatosTicket, tipo: TipoRecibo, ancho: AnchoPapel): str
   .f .l { flex: 0 0 auto; }
   .f .v { flex: 1 1 auto; min-width: 0; text-align: right; word-break: break-word; }
 
-  .letras { margin-top: 1.5mm; font-size: 8pt; word-break: break-word; }
+  /* El monto en letras es la línea más larga del recibo y casi nadie la lee en
+     detalle: queda por debajo del cuerpo para no estirar el ticket, pero sube
+     de 8pt a 11pt para seguir siendo legible. */
+  .letras { margin-top: 1.5mm; font-size: 11pt; word-break: break-word; }
 
   /* Que ninguna sección se parta al medio si el driver decide cortar antes de
      tiempo. No arregla el corte —para eso está .fin— pero decide DÓNDE cae:
      mejor que se vaya un bloque entero al papel siguiente y no media línea. */
-  .f, .letras { break-inside: avoid; page-break-inside: avoid; }
+  .f, .letras, .total { break-inside: avoid; page-break-inside: avoid; }
 
   /* Espacio en blanco al pie, para cortar el papel sin comerse las últimas
      líneas. Antes acá iba la firma del cobrador; al sacarla, este colchón toma
@@ -165,7 +215,7 @@ ${d.interes && d.interes !== "0" ? fila("Interés", "Gs.: " + d.interes) : ""}
 
 <hr>
 
-<div class="f g"><span class="l">TOTAL</span><span class="v">Gs.: ${esc(d.monto)}</span></div>
+<div class="total"><div class="rot">TOTAL</div><div class="imp">${esc(importe)}</div></div>
 ${d.montoLetras ? `<div class="letras">Son: ${esc(d.montoLetras)}</div>` : ""}
 
 <hr>
