@@ -200,6 +200,7 @@ export type DatosTicket = {
   fecha: string; // ya formateada, dd/mm/aaaa
   monto: string; // ya formateado con separador de miles
   documento: string; // CI o RUC del cliente
+  cliente: string; // razón social del cliente, sin el CI adelante
   montoLetras: string;
   concepto: string;
   solicitud: number | string;

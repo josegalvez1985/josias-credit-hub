@@ -42,6 +42,9 @@ export function ticketDesdeRecibo(d: ReciboDetalle): DatosTicket {
       : fecha.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" }),
     monto: d.monto.toLocaleString("es-PY"),
     documento: d.documento ?? "",
+    // `nombre` viene como "CI + razón social" (así lo arma el listado) y el CI
+    // ya tiene su propia fila, así que se prefiere `razon_social`, que viene limpio.
+    cliente: d.razon_social ?? d.nombre ?? "",
     montoLetras: d.monto_letras ?? "",
     concepto: d.concepto ?? "",
     solicitud: d.nro_solicitud,

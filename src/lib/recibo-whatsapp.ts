@@ -34,6 +34,7 @@ export function mensajeWhatsApp(d: DatosTicket): string {
     "",
     "▸ Recibo N°:   " + d.nroRecibo,
     "▸ Fecha:        " + d.fecha,
+    "▸ Cliente:      " + d.cliente,
     "▸ CI Cliente:   " + d.documento,
     "▸ Solicitud:    " + d.solicitud,
     "▸ Cuota:        " + d.cuota,
@@ -85,6 +86,23 @@ function rectRedondeado(
   ctx.closePath();
   if (relleno) ctx.fill();
   if (borde) ctx.stroke();
+}
+
+// Baja el cuerpo de la fuente hasta que el texto entra en `anchoMax`, con un
+// piso para que no quede ilegible. El nombre del cliente es el unico valor de
+// la tabla que puede no entrar en su columna; el resto son numeros y fechas.
+function ajustarFuente(
+  ctx: CanvasRenderingContext2D,
+  texto: string,
+  anchoMax: number,
+  base: number,
+) {
+  let px = base;
+  ctx.font = px + "px Arial";
+  while (px > 17 && ctx.measureText(texto).width > anchoMax) {
+    px -= 1;
+    ctx.font = px + "px Arial";
+  }
 }
 
 function textoEnvuelto(
@@ -143,6 +161,7 @@ export function dibujarRecibo(d: DatosTicket): HTMLCanvasElement {
   const filas: [string, string][] = [
     ["Nro. de Recibo", String(d.nroRecibo || "—")],
     ["Fecha", d.fecha || "—"],
+    ["Cliente", d.cliente || "—"],
     ["CI Cliente", d.documento || "—"],
     ["Nro. Solicitud", String(d.solicitud || "—")],
     ["Cuota Nro.", d.cuota || "—"],
@@ -167,7 +186,7 @@ export function dibujarRecibo(d: DatosTicket): HTMLCanvasElement {
     ctx.font = "bold 27px Arial";
     ctx.fillText(etiqueta, PAD + 16, y + 40);
     ctx.fillStyle = "#1e293b";
-    ctx.font = "27px Arial";
+    ajustarFuente(ctx, valor, tblW - colW - 32, 27);
     ctx.fillText(valor, PAD + colW + 16, y + 40);
     y += rowH;
   });
