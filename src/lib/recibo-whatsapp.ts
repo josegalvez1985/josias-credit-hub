@@ -166,7 +166,12 @@ export function dibujarRecibo(d: DatosTicket): HTMLCanvasElement {
     ["Nro. Solicitud", String(d.solicitud || "—")],
     ["Cuota Nro.", d.cuota || "—"],
     ["Monto Gs.", d.monto || "—"],
-    ["Intereses Gs.", d.interes || "0"],
+    // El interes solo va si existe, igual que en el ticket (escpos.ts), el
+    // visor de Windows (recibo-sistema.ts) y el mensaje de texto de arriba:
+    // una fila "Intereses Gs. 0" en todos los recibos es ruido.
+    ...(d.interes && d.interes !== "0"
+      ? ([["Intereses Gs.", d.interes]] as [string, string][])
+      : []),
     ["Cobrador", d.cobrador || "—"],
   ];
 
