@@ -6,6 +6,10 @@ Tailwind CSS v4 y backend ORDS/Oracle. Cubre dos circuitos:
 - **Solicitudes** (asesores) — registro y gestión de solicitudes de crédito.
 - **Recibos** (cobradores) — emisión, consulta y anulación de recibos de cobranza.
   Se está migrando desde una app Oracle APEX, página por página.
+- **Administración** (ERP) — consulta e impresión de créditos otorgados. A
+  diferencia de los otros dos, es de **escritorio**: solo aparece para los
+  usuarios de la lista blanca de [src/lib/permisos.ts](src/lib/permisos.ts) y en
+  pantallas de 1024px o más.
 
 ## Documentación
 
@@ -19,6 +23,7 @@ Antes de tocar código, leer la guía que corresponda:
 | [backend/README.md](backend/README.md) | Convenciones de ORDS/Oracle, despliegue de módulos y errores frecuentes |
 | [GUIA-LOGIN.md](GUIA-LOGIN.md) | Autenticación, tokens, cómo proteger un endpoint |
 | [src/routes/README.md](src/routes/README.md) | File-based routing de TanStack Start |
+| [GUIA-IMPRESION-USB.md](GUIA-IMPRESION-USB.md) | Las vías de impresión del recibo y el error de Windows con la térmica USB |
 
 ## Requisitos
 
@@ -88,6 +93,7 @@ API ORDS sobre Oracle. Todo el código de base de datos está en [backend/](back
 | `/solicitudes/*` | [backend/solicitudes.sql](backend/solicitudes.sql) | Cabecera, detalle, referencias, actividad laboral, LOVs, precios |
 | `/recibos/*` | [backend/recibos.sql](backend/recibos.sql) | Listado, alta, edición, anulación de recibos y sus LOVs |
 | `/consultas/*` | [backend/consultas.sql](backend/consultas.sql) | Ficha de cliente (solo lectura, sin paquete) |
+| `/operaciones/*` | [backend/operaciones.sql](backend/operaciones.sql) | Créditos otorgados: cabecera, artículos, actividad, referencias y cuotas (solo lectura) |
 | `/clientes/*` | — | Todavía no versionado (ver `backend/README.md`) |
 
 El cliente HTTP está en [src/lib/api.ts](src/lib/api.ts).

@@ -207,6 +207,7 @@ function construirHtml(d: DatosTicket, tipo: TipoRecibo, ancho: AnchoPapel): str
 
 ${fila("Recibo N°", d.nroRecibo)}
 ${fila("Fecha", d.fecha)}
+${fila("Cliente", d.cliente)}
 ${fila("CI", d.documento)}
 ${fila("Solicitud", d.solicitud)}
 ${fila("Cuota", d.cuota)}

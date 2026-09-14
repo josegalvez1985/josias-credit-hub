@@ -313,13 +313,16 @@ function NuevoRecibo() {
                 )}
               </Field>
 
-              <Field label="Fecha del recibo" required>
-                <Input
-                  type="date"
-                  value={fecha}
-                  max={hoy()}
-                  onChange={(e) => setFecha(e.target.value)}
-                />
+              {/* La fecha del recibo NO se edita: siempre es la del día del
+                  cobro. Se muestra como dato fijo en vez de un <input> ya que
+                  un campo deshabilitado invita a intentar tocarlo igual. El
+                  valor se sigue mandando al backend (ver onSubmit), no se
+                  delega en el SYSDATE de Oracle: así la fecha es la del
+                  dispositivo del cobrador y no la del servidor. */}
+              <Field label="Fecha del recibo">
+                <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 text-sm font-medium">
+                  {formatFecha(fecha)}
+                </div>
               </Field>
             </div>
 

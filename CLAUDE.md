@@ -13,6 +13,11 @@ página de APEX por vez** con su PL/SQL, y de cada una sale un endpoint ORDS + u
 la query de un LOV, un trigger o una validación, **hay que pedirlo antes de escribir código** —
 no inventar ni asumir. La lista de qué pedir está en `GUIA-BACKEND.md` §2.
 
+El módulo de Recibos ya está completo (las 6 secciones del menú de APEX). La línea de trabajo
+abierta es el **módulo administrativo** (`/admin/*`, ERP): créditos otorgados, de escritorio y
+por ahora **solo lectura** — `VENTAS_CABECERA` tiene cinco triggers que regeneran el plan de
+cuotas. Ver `GUIA-BACKEND.md` §7.
+
 ## Guías (leer la que corresponda antes de tocar código)
 
 | Archivo | Para qué |
@@ -39,6 +44,7 @@ o un listado, releer esta tabla.** El síntoma casi nunca apunta a la causa.
 | Las tarjetas se salen de la pantalla | Flex items y grid tracks tienen **`min-width: auto`** | `grid-cols-1` (no `grid` pelado) + `min-w-0` donde se trunca. `GUIA-FRONTEND.md` §9 |
 | Un cambio no aparece en el navegador | **Service worker** sirviendo la versión cacheada | Application → Service Workers → Unregister → Ctrl+Shift+R |
 | El endpoint devuelve 500 pero el SQL está bien | Un **GET que llama a un paquete `INVALID`** | Los handlers de lectura van con SQL puro, sin paquetes |
+| Un feed devuelve `items: []` sin ningún error | Se mandó `limit`/`offset` a un handler **`json/query`**, donde esos parámetros no existen. Solo los `plsql/block` los declaran como binds propios | `json/query` pagina con **`?page=N`** y avisa que hay más con un link `next` (no con `hasMore`). Ver `listarCreditos` en `api.ts` |
 
 **Y la regla que las engloba a todas:** cuando algo falla, **mirar cómo lo resuelve el código que ya
 funciona** (`solicitudes`, `clientes`) antes de inventar una solución nueva. Casi todos estos errores

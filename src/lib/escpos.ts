@@ -246,6 +246,12 @@ export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
   t.alinear(IZQUIERDA).tamano(ALTO);
   t.fila("Recibo N", String(d.nroRecibo));
   t.fila("Fecha", d.fecha);
+  // El nombre es largo y la fila "etiqueta ... valor" lo mandaría al renglón
+  // siguiente partido al medio, así que va como párrafo debajo de su etiqueta.
+  if (d.cliente) {
+    t.linea("Cliente:");
+    t.parrafo(d.cliente);
+  }
   if (d.documento) t.fila("CI", d.documento);
   t.fila("Solicitud", String(d.solicitud));
   t.fila("Cuota", d.cuota);

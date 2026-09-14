@@ -141,6 +141,60 @@ Detalle completo en [backend/README.md](backend/README.md); estos son los que m�
 **El módulo de Recibos quedó completo**: las 6 secciones del menú de la app APEX
 "Josias Muebles Cobradores" están migradas.
 
+---
+
+## 7. Módulo administrativo (ERP) — créditos otorgados
+
+Arrancó el 2026-08-06 con la página 18 de la app APEX 70967 ("Facturas" /
+Créditos Otorgados). Es una línea de trabajo distinta a la de cobranzas: se usa
+**sentado frente a una PC**, no en el celular del cobrador.
+
+| Pieza | Estado |
+| --- | --- |
+| `backend/operaciones.sql` | ✅ desplegado — módulo ORDS `operaciones`, **sin paquete** (SQL puro) |
+| Cliente HTTP | ✅ hecho — `listarCreditos`, `obtenerCreditoCompleto` y los cuatro hijos en `api.ts` |
+| Listado | ✅ hecho — [\_app.admin.creditos.index.tsx](src/routes/_app.admin.creditos.index.tsx) |
+| Detalle | ✅ hecho — [\_app.admin.creditos.$id.tsx](src/routes/_app.admin.creditos.$id.tsx) |
+| Impresos | ✅ solicitud y pagaré — `impresion-solicitud.ts`, `impresion-pagare.ts` |
+| Permisos | ⚠️ lista blanca en el cliente ([src/lib/permisos.ts](src/lib/permisos.ts)) — **falta la validación en Oracle** |
+
+### Tres cosas que no hay que perder de vista
+
+**`VENTAS_*` no es `SOLICITUD_VENTAS_*`.** Son tablas distintas: las
+`SOLICITUD_VENTAS_*` son la solicitud que carga el asesor (módulo
+`solicitudes`); las `VENTAS_*` son el crédito ya otorgado. Confundirlas es fácil
+porque los nombres de columna se parecen.
+
+**Es de solo lectura a propósito, no por falta de tiempo.** Sobre
+`VENTAS_CABECERA` hay cinco triggers que regeneran el plan entero de
+`VENTAS_CUOTAS`, de donde cuelgan los saldos y los recibos ya cobrados. Si
+alguna vez se agrega escritura, vale la misma regla que en recibos: el código
+**no** toca `VENTAS_CUOTAS` ni calcula vencimientos. El detalle está en la
+cabecera de `backend/operaciones.sql`.
+
+**Los permisos de hoy son de interfaz, no de seguridad.** `permisos.ts` decide
+qué se dibuja; cualquiera que edite el bundle hace aparecer el menú. Cuando
+estas pantallas tengan endpoints de escritura, cada handler tiene que validar
+contra el token quién está llamando (§1.5 de [GUIA-LOGIN.md](GUIA-LOGIN.md)).
+
+### La paginación de `operaciones` no es la de `recibos`
+
+Los dos listados paginan del lado del servidor, pero **con esquemas distintos**,
+y mezclarlos falla en silencio:
+
+| | `recibos` | `operaciones/creditos` |
+| --- | --- | --- |
+| Tipo de handler | `plsql/block` | `json/query` |
+| Paginación | `?limit=&offset=` (binds propios) | `?page=N` (lo maneja ORDS) |
+| "Hay más" | `hasMore` que arma el PL/SQL | link `next` que agrega ORDS |
+| Búsqueda | bind `:q`… | …pero el parámetro se llama **`buscar`** |
+
+Mandarle `limit`/`offset` a un `json/query` devuelve `items: []` **sin ningún
+error**. Costó una tarde el 2026-08-06.
+
+> El parámetro de búsqueda nunca puede llamarse `q`: es reservado de ORDS
+> (§5). Por eso acá es `buscar`.
+
 Ojo con una excepción: la ficha de cliente de la pág. 10 **no vive en el módulo
 `recibos`** sino en [backend/consultas.sql](backend/consultas.sql)
 (`GET /consultas/cliente/:cod_cliente`). El handler original estaba en `recibos`

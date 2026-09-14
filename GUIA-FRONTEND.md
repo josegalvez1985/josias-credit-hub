@@ -140,6 +140,30 @@ un solo toast (`Completá: A, B, C`) · botones Cancelar/Guardar al pie · `navi
 
 Para flujos largos usar el patrón de wizard con `Stepper` de `solicitudes.nueva`.
 
+### D. La excepción: el módulo administrativo (escritorio)
+
+Todo lo anterior es mobile-first porque la app se usa en el celular. El módulo
+administrativo (`/admin/*`) es lo contrario: se usa **sentado frente a una PC**,
+solo por unas pocas personas, y ahí las reglas cambian a propósito.
+
+- **Tabla de verdad, no grilla de tarjetas.** Conservar las columnas del
+  Interactive Grid de APEX es lo que se espera. Ref:
+  [\_app.admin.creditos.index.tsx](src/routes/_app.admin.creditos.index.tsx).
+- **Barra lateral en vez de la barra inferior** —
+  [admin-sidebar.tsx](src/components/admin-sidebar.tsx), con grupos plegables y
+  buscador. En el celular el módulo no aparece.
+- **Una entrada nueva se declara en un solo lugar**: `GRUPOS_ADMIN` de
+  [admin-menu.tsx](src/components/admin-menu.tsx). De ahí salen solas la barra
+  lateral y el índice de `/admin`; después solo falta crear la ruta.
+  Es la diferencia con el menú del cobrador, donde **sí** hay que tocar
+  `app-header.tsx` y `bottom-nav.tsx` a mano.
+- **El ancho completo** se consigue neutralizando el contenedor de `_app` con
+  márgenes negativos (ver [\_app.admin.tsx](src/routes/_app.admin.tsx)). Si
+  cambia el padding de `_app`, hay que acompañarlo ahí.
+
+Quién lo ve lo decide [src/lib/permisos.ts](src/lib/permisos.ts): lista blanca de
+usuarios **y** pantalla ≥ 1024 px. Es una barrera de interfaz, no de seguridad.
+
 ---
 
 ## 5. Equivalencias APEX → esta app
@@ -243,7 +267,51 @@ Probar siempre con **el texto más largo de los datos reales**, no con "Juan Pé
 En recibos el nombre viene como `CI + razón social` ("4.694.130 Yadira Magaly
 Ibarra Gonzalez") y rompe cualquier layout que no tenga esto.
 
-## 10. Checklist antes de dar por hecha una página
+## 10. Impresos
+
+Hay **dos familias** de impresión y no se mezclan.
+
+**Ticket térmico (58 mm)** — el recibo del cobrador, por tres vías que comparten
+el mismo contenido:
+
+| Vía | Archivo | Cómo |
+| --- | --- | --- |
+| Bluetooth | [escpos.ts](src/lib/escpos.ts) | bytes ESC/POS directos — es la vía del cobrador |
+| USB | [escpos-usb.ts](src/lib/escpos-usb.ts) | los mismos bytes, otro cable |
+| Windows | [recibo-sistema.ts](src/lib/recibo-sistema.ts) | HTML + `window.print()`, por el driver ya instalado |
+
+`escpos.ts` es el dueño del formato: `escpos-usb.ts` lo importa y
+`recibo-sistema.ts` replica el mismo orden en HTML. **Si se agrega un dato al
+ticket, va en las tres** — y en el mensaje de WhatsApp
+([recibo-whatsapp.ts](src/lib/recibo-whatsapp.ts)), que dibuja su propio PNG.
+
+**Documento en hoja (oficio, 216 × 330 mm)** — los tres comparten layout
+(recuadros, tabla con encabezado oscuro, pares label/valor, firmas) para que
+salgan con la misma cara:
+
+| Impreso | Archivo |
+| --- | --- |
+| Recibo | [impresion-recibo.ts](src/lib/impresion-recibo.ts) |
+| Solicitud | [impresion-solicitud.ts](src/lib/impresion-solicitud.ts) |
+| Pagaré | [impresion-pagare.ts](src/lib/impresion-pagare.ts) |
+
+Convenciones que comparten y conviene no romper:
+
+- `@page { margin: 0 }` y el margen dibujado con el padding de `.hoja`. Si se le
+  da un margen a `@page`, el navegador suma el suyo y el usuario tiene que
+  corregirlo a mano en el diálogo.
+- Todo lo que viene de la base pasa por un `esc()`: el concepto y los nombres
+  son texto libre cargado a mano.
+- La barra de acciones lleva `.noprint` / `@media print { display: none }`.
+- Se abren con `document.write` sobre una pestaña nueva, no con un blob URL: con
+  blob el logo (ruta relativa) no resuelve, y Safari en iOS las bloquea.
+
+Detalle de las vías del ticket y del error de Windows con la térmica USB en
+[GUIA-IMPRESION-USB.md](GUIA-IMPRESION-USB.md).
+
+---
+
+## 11. Checklist antes de dar por hecha una página
 
 1. ¿Los cuatro estados (cargando / error / vacío / datos) están cubiertos?
 2. ¿Se ve bien a 360 px de ancho, **con los textos más largos de los datos reales**?
