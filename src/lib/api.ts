@@ -390,7 +390,7 @@ export type ReciboDetalle = Recibo & {
   fec_vencimiento?: string;
   cuota_texto?: string;
   nombre_usuario?: string;
-  monto_letras?: string;
+  monto_letras?: string; // del TOTAL (monto + interes), ver obtenerRecibo
 };
 
 export type FiltroRecibos = {
@@ -416,11 +416,27 @@ export async function listarRecibos(f: FiltroRecibos = {}) {
   return { items: r.items ?? [], hasMore: Boolean(r.hasMore) };
 }
 
+// Lo que efectivamente pago el cliente: la cuota mas el interes por mora.
+// MONTO es solo lo que se descuenta de la cuota (TRG_ACTUALIZA_CUOTA, y por eso
+// no puede superar el saldo); el interes se guarda aparte en TOTAL_INTERES.
+// Todas las vistas e impresos del recibo muestran este total, no el MONTO.
+export function totalRecibo(r: { monto: number; total_interes?: number | null }): number {
+  return (r.monto ?? 0) + (r.total_interes ?? 0);
+}
+
 // La PK es (nro_recibo, id_solicitud, id_cuota), asi que el backend devuelve una
 // lista. En la practica es una sola fila.
+//
+// El handler arma MONTO_LETRAS con NUM_LETRAS(cc.monto), sin el interes. Cuando
+// hay interes se pide de nuevo con el total a /recibos/letras, asi el "Son:" de
+// todos los impresos dice lo mismo que el TOTAL sin redesplegar el modulo.
 export async function obtenerRecibo(nroRecibo: number) {
   const r = await request<{ items: ReciboDetalle[] }>(`/recibos/${nroRecibo}`);
-  return r.items?.[0] ?? null;
+  const d = r.items?.[0] ?? null;
+  if (d && (d.total_interes ?? 0) > 0) {
+    d.monto_letras = await montoEnLetras(totalRecibo(d));
+  }
+  return d;
 }
 
 export type ReciboInput = {

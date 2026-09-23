@@ -5,7 +5,7 @@
 // PNG al portapapeles y se abre WhatsApp para que el usuario lo pegue.
 // Si el navegador no soporta copiar imágenes, se descarga el archivo.
 
-import type { DatosTicket } from "./escpos";
+import { tieneInteres, type DatosTicket } from "./escpos";
 
 // ---------------------------------------------------------------------
 // Teléfono
@@ -38,8 +38,14 @@ export function mensajeWhatsApp(d: DatosTicket): string {
     "▸ CI Cliente:   " + d.documento,
     "▸ Solicitud:    " + d.solicitud,
     "▸ Cuota:        " + d.cuota,
-    "▸ Monto:        Gs. " + d.monto,
-    d.interes && d.interes !== "0" ? "▸ Intereses:    Gs. " + d.interes : null,
+    // Con interés va el desglose y el total; sin él, el monto ya es el total.
+    ...(tieneInteres(d)
+      ? [
+          "▸ Pago cuota:   Gs. " + d.importeCuota,
+          "▸ Intereses:    Gs. " + d.interes,
+          "▸ *TOTAL:        Gs. " + d.monto + "*",
+        ]
+      : ["▸ Monto:        Gs. " + d.monto]),
     "▸ Cobrador:     " + d.cobrador,
     "",
     "📝 _" + (d.concepto || "") + "_",
@@ -165,13 +171,16 @@ export function dibujarRecibo(d: DatosTicket): HTMLCanvasElement {
     ["CI Cliente", d.documento || "—"],
     ["Nro. Solicitud", String(d.solicitud || "—")],
     ["Cuota Nro.", d.cuota || "—"],
-    ["Monto Gs.", d.monto || "—"],
-    // El interes solo va si existe, igual que en el ticket (escpos.ts), el
-    // visor de Windows (recibo-sistema.ts) y el mensaje de texto de arriba:
-    // una fila "Intereses Gs. 0" en todos los recibos es ruido.
-    ...(d.interes && d.interes !== "0"
-      ? ([["Intereses Gs.", d.interes]] as [string, string][])
-      : []),
+    // El desglose solo va si hay interés, igual que en el ticket (escpos.ts),
+    // el visor de Windows (recibo-sistema.ts) y el mensaje de texto de arriba:
+    // sin interés las filas repetirían el mismo número que el total.
+    ...(tieneInteres(d)
+      ? ([
+          ["Pago cuota Gs.", d.importeCuota],
+          ["Intereses Gs.", d.interes],
+          ["TOTAL Gs.", d.monto],
+        ] as [string, string][])
+      : ([["Monto Gs.", d.monto || "—"]] as [string, string][])),
     ["Cobrador", d.cobrador || "—"],
   ];
 

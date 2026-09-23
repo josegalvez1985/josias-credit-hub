@@ -198,16 +198,23 @@ class Ticket {
 export type DatosTicket = {
   nroRecibo: number | string;
   fecha: string; // ya formateada, dd/mm/aaaa
-  monto: string; // ya formateado con separador de miles
+  monto: string; // el TOTAL cobrado (cuota + interés), ya formateado con separador de miles
   documento: string; // CI o RUC del cliente
   cliente: string; // razón social del cliente, sin el CI adelante
-  montoLetras: string;
+  montoLetras: string; // del TOTAL
   concepto: string;
   solicitud: number | string;
   cuota: string;
   cobrador: string;
+  importeCuota: string; // lo que se descuenta de la cuota (MONTO en la base)
   interes: string;
 };
+
+// Hay interés que desglosar. Sin interés el importe de la cuota ES el total, y
+// repetirlo en una fila aparte es ruido.
+export function tieneInteres(d: DatosTicket): boolean {
+  return Boolean(d.interes) && d.interes !== "0";
+}
 
 export type TipoRecibo = "ORIGINAL" | "DUPLICADO";
 
@@ -255,12 +262,19 @@ export function construirRecibo(d: DatosTicket, tipo: TipoRecibo): Uint8Array {
   if (d.documento) t.fila("CI", d.documento);
   t.fila("Solicitud", String(d.solicitud));
   t.fila("Cuota", d.cuota);
-  // El interés solo aparece si existe, igual que en el visor: una fila
-  // "Interes .... 0" en todos los recibos es ruido.
-  if (d.interes && d.interes !== "0") t.fila("Interes Gs.", d.interes);
   if (d.cobrador) t.fila("Cobrador", d.cobrador);
 
   t.tamano(NORMAL).regla();
+
+  // ---- Desglose: cuota + interés = TOTAL ----
+  // Solo si hay interés, igual que en el visor: sin él las dos filas serían
+  // el mismo número que el TOTAL.
+  if (tieneInteres(d)) {
+    t.tamano(ALTO);
+    t.fila("Pago cuota", d.importeCuota);
+    t.fila("Interes", d.interes);
+    t.tamano(NORMAL).regla();
+  }
 
   // ---- TOTAL: lo más grande del ticket ----
   t.tamano(GRANDE).negrita(true);

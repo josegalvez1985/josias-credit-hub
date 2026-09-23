@@ -14,7 +14,7 @@ import { imprimirRecibo, soportaImpresion, type DatosTicket } from "@/lib/escpos
 import { imprimirReciboUsb, olvidarImpresoraUsb, soportaImpresionUsb } from "@/lib/escpos-usb";
 import { imprimirReciboSistema } from "@/lib/recibo-sistema";
 import { imprimirReciboDocumento } from "@/lib/impresion-recibo";
-import type { ReciboDetalle } from "@/lib/api";
+import { totalRecibo, type ReciboDetalle } from "@/lib/api";
 import {
   abrirWhatsApp,
   copiarImagen,
@@ -40,7 +40,9 @@ export function ticketDesdeRecibo(d: ReciboDetalle): DatosTicket {
     fecha: isNaN(fecha.getTime())
       ? d.fecha_recibo
       : fecha.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" }),
-    monto: d.monto.toLocaleString("es-PY"),
+    // El TOTAL es cuota + interés; `monto_letras` ya viene del total (obtenerRecibo).
+    monto: totalRecibo(d).toLocaleString("es-PY"),
+    importeCuota: d.monto.toLocaleString("es-PY"),
     documento: d.documento ?? "",
     // `nombre` viene como "CI + razón social" (así lo arma el listado) y el CI
     // ya tiene su propia fila, así que se prefiere `razon_social`, que viene limpio.

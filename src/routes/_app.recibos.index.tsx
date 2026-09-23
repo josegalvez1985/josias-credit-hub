@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, Receipt, Loader2, AlertCircle, RefreshCw, Plus, Ban, Eye } from "lucide-react";
-import { listarRecibos, obtenerRecibo, type Recibo, type ReciboDetalle } from "@/lib/api";
+import { listarRecibos, obtenerRecibo, totalRecibo, type Recibo, type ReciboDetalle } from "@/lib/api";
 import { formatCurrency } from "@/lib/credit-applications";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -185,7 +185,7 @@ function RecibosPage() {
                     <TableHead>Nombre</TableHead>
                     <TableHead className="text-right">Nro Solicitud</TableHead>
                     <TableHead className="text-right">Nro Cuota</TableHead>
-                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -217,8 +217,15 @@ function RecibosPage() {
                         <TableCell className="text-right">
                           {r.nro_cuota === 0 ? "Ent. inicial" : r.nro_cuota}
                         </TableCell>
-                        <TableCell className="text-right font-display font-semibold">
-                          {formatCurrency(r.monto)}
+                        {/* Total = cuota + interés (totalRecibo). El interés se aclara
+                            debajo para que el número no parezca no cerrar con la cuota. */}
+                        <TableCell className="text-right">
+                          <span className="font-display font-semibold">{formatCurrency(totalRecibo(r))}</span>
+                          {(r.total_interes ?? 0) > 0 && (
+                            <span className="block text-[11px] text-muted-foreground">
+                              incl. int. {formatCurrency(r.total_interes ?? 0)}
+                            </span>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -297,7 +304,12 @@ function ReciboCard({ recibo: r, onVer }: { recibo: Recibo; onVer: () => void })
           </div>
 
           <p className="mt-1 truncate font-display text-lg font-semibold tracking-tight">
-            {formatCurrency(r.monto)}
+            {formatCurrency(totalRecibo(r))}
+            {(r.total_interes ?? 0) > 0 && (
+              <span className="ml-2 font-sans text-xs font-normal tracking-normal text-muted-foreground">
+                incl. int. {formatCurrency(r.total_interes ?? 0)}
+              </span>
+            )}
           </p>
 
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -353,8 +365,13 @@ function DetalleDialog({ nroRecibo, onClose }: { nroRecibo: number | null; onClo
         ) : (
           <div className="space-y-4">
             <div className="rounded-2xl bg-gradient-caramel p-5 text-primary-foreground shadow-elegant">
-              <p className="text-xs uppercase tracking-wider opacity-80">Monto cobrado</p>
-              <p className="mt-1 font-display text-3xl font-semibold">{formatCurrency(detalle.monto)}</p>
+              <p className="text-xs uppercase tracking-wider opacity-80">Total cobrado</p>
+              <p className="mt-1 font-display text-3xl font-semibold">{formatCurrency(totalRecibo(detalle))}</p>
+              {(detalle.total_interes ?? 0) > 0 && (
+                <p className="mt-1 text-xs opacity-80">
+                  Cuota {formatCurrency(detalle.monto)} + intereses {formatCurrency(detalle.total_interes ?? 0)}
+                </p>
+              )}
               {detalle.monto_letras && (
                 <p className="mt-1 text-xs opacity-80">{detalle.monto_letras}</p>
               )}
@@ -373,7 +390,8 @@ function DetalleDialog({ nroRecibo, onClose }: { nroRecibo: number | null; onClo
               <Row label="Vencimiento" value={detalle.fec_vencimiento ? formatDate(detalle.fec_vencimiento) : undefined} />
               <Row label="Monto de la cuota" value={detalle.monto_cuota != null ? formatCurrency(detalle.monto_cuota) : undefined} />
               <Row label="Saldo previo" value={detalle.saldo_cuota != null ? formatCurrency(detalle.saldo_cuota) : undefined} />
-              <Row label="Intereses" value={detalle.total_interes != null ? formatCurrency(detalle.total_interes) : undefined} />
+              <Row label="Pago a la cuota" value={formatCurrency(detalle.monto)} />
+              <Row label="Intereses" value={formatCurrency(detalle.total_interes ?? 0)} />
               <Row label="Cobrador" value={detalle.nombre_usuario ?? detalle.cod_usuario} />
             </div>
 

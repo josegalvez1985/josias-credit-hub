@@ -19,7 +19,7 @@
 // los maneja el driver) y aparece el diálogo de impresión. Por eso no reemplaza
 // al Bluetooth: es el plan B para el puesto fijo con impresora por cable.
 
-import type { DatosTicket, TipoRecibo } from "./escpos";
+import { tieneInteres, type DatosTicket, type TipoRecibo } from "./escpos";
 
 // Ancho del papel térmico. 58mm es el rollo más común en la calle; 80mm el de
 // mostrador. El contenido usa todo el ancho menos un margen mínimo, porque el
@@ -109,7 +109,7 @@ function construirHtml(d: DatosTicket, tipo: TipoRecibo, ancho: AnchoPapel): str
        8 de margen) entran ~18 caracteres a 13pt. NO son las 32 columnas del
        ESC/POS: la fuente interna de la térmica es mucho más angosta que la
        Courier del navegador, y por eso los dos recibos se ven parecidos pero
-       no idénticos. La fila más larga ("Interes / Gs.: 6.600") mide 18: subir
+       no idénticos. La fila más larga ("Pago cuota / 350.000") mide 18: subir
        de 13pt parte las filas "etiqueta / valor" en dos renglones. */
     font-size: 13pt;
     line-height: 1.3;
@@ -212,10 +212,22 @@ ${fila("CI", d.documento)}
 ${fila("Solicitud", d.solicitud)}
 ${fila("Cuota", d.cuota)}
 ${d.concepto ? fila("Concepto", d.concepto) : ""}
-${d.interes && d.interes !== "0" ? fila("Interés", "Gs.: " + d.interes) : ""}
 
 <hr>
 
+${
+  // Desglose cuota + interés = TOTAL, mismo criterio que escpos.ts: solo si hay
+  // interés, porque sin él las filas repetirían el TOTAL. Sin el "Gs.:" y con
+  // rótulos cortos: entran ~18 caracteres por renglón (ver font-size) y
+  // "Pago cuota 350.000" ya son 18.
+  tieneInteres(d)
+    ? `${fila("Pago cuota", d.importeCuota)}
+${fila("Interés", d.interes)}
+
+<hr>
+`
+    : ""
+}
 <div class="total"><div class="rot">TOTAL</div><div class="imp">${esc(importe)}</div></div>
 ${d.montoLetras ? `<div class="letras">Son: ${esc(d.montoLetras)}</div>` : ""}
 

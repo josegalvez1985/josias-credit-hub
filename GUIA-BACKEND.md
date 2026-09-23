@@ -226,4 +226,12 @@ tocar `VENTAS_CUOTAS` ni calcular el número de recibo:
 
 Por eso el `INSERT` va con `NRO_RECIBO` en NULL y se recupera con `RETURNING`.
 
+**`MONTO` no incluye el interés.** Es solo lo que se descuenta de la cuota (por
+eso no puede superar el saldo). El interés por mora se guarda aparte en
+`TOTAL_INTERES`, que es una foto de `V_SALDOS` al momento del cobro. Lo que pagó
+el cliente es `MONTO + TOTAL_INTERES`: todas las vistas e impresos muestran ese
+total con `totalRecibo()` de `api.ts`, y el "Son:" en letras se pide con ese
+total a `/recibos/letras` (el handler del detalle arma `NUM_LETRAS(cc.monto)`,
+sin el interés).
+
 Se irá actualizando esta tabla a medida que avance la migración.

@@ -7,6 +7,7 @@ import {
   filtrarLov,
   lovRecibos,
   obtenerRecibo,
+  totalRecibo,
   type DatosCuota,
   type LovItem,
   type ReciboDetalle,
@@ -100,6 +101,9 @@ function NuevoRecibo() {
 
   const montoNum = Number(monto.replace(/\D/g, "")) || 0;
   const saldo = datos?.saldo_cuota ?? 0;
+  // El backend guarda el interés de V_SALDOS al emitir, no lo que se tipea:
+  // acá solo se muestra para que el cobrador vea el total (ver totalRecibo).
+  const interes = datos?.total_interes ?? 0;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -158,10 +162,15 @@ function NuevoRecibo() {
           </div>
 
           <div className="rounded-2xl bg-gradient-caramel p-5 text-primary-foreground shadow-elegant">
-            <p className="text-xs uppercase tracking-wider opacity-80">Monto cobrado</p>
+            <p className="text-xs uppercase tracking-wider opacity-80">Total cobrado</p>
             <p className="mt-1 font-display text-3xl font-semibold">
-              {formatCurrency(emitido.monto)}
+              {formatCurrency(totalRecibo(emitido))}
             </p>
+            {(emitido.total_interes ?? 0) > 0 && (
+              <p className="mt-1 text-xs opacity-80">
+                Cuota {formatCurrency(emitido.monto)} + intereses {formatCurrency(emitido.total_interes ?? 0)}
+              </p>
+            )}
             {emitido.monto_letras && <p className="mt-1 text-xs opacity-80">{emitido.monto_letras}</p>}
           </div>
 
@@ -299,7 +308,7 @@ function NuevoRecibo() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Monto a cobrar" required>
+              <Field label={interes > 0 ? "Pago a la cuota" : "Monto a cobrar"} required>
                 <Input
                   inputMode="numeric"
                   value={montoNum ? montoNum.toLocaleString("es-PY") : ""}
@@ -325,6 +334,23 @@ function NuevoRecibo() {
                 </div>
               </Field>
             </div>
+
+            {/* El interés se cobra aparte del monto (que es solo lo que se
+                descuenta de la cuota), así que el cobrador tiene que ver el
+                total que le pide al cliente antes de emitir. */}
+            {interes > 0 && montoNum > 0 && (
+              <div className="flex items-baseline justify-between gap-3 rounded-xl border border-primary bg-primary/10 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Total a cobrar</p>
+                  <p className="text-xs text-muted-foreground">
+                    Cuota {formatCurrency(montoNum)} + intereses {formatCurrency(interes)}
+                  </p>
+                </div>
+                <p className="shrink-0 font-display text-2xl font-semibold tracking-tight">
+                  {formatCurrency(montoNum + interes)}
+                </p>
+              </div>
+            )}
 
             <Field label="Concepto">
               <Textarea

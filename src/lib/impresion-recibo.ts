@@ -24,7 +24,7 @@
 //             de .hoja, para imprimir sin tocar el diálogo.
 //   Tipos     Helvetica; labels 7.5pt bold, valores 9pt
 
-import type { ReciboDetalle } from "./api";
+import { totalRecibo, type ReciboDetalle } from "./api";
 import type { TipoRecibo } from "./escpos";
 
 // Escapa el texto que va al HTML. Todo lo que viene de la base pasa por acá:
@@ -68,7 +68,11 @@ function construirHtml(d: ReciboDetalle, tipo: TipoRecibo, logoUrl: string): str
   // El recibo cobra la cuota más, si lo hubiera, el interés por mora. Se
   // muestran como dos renglones y un total, que es lo que permite al cliente
   // ver por qué pagó más que el monto de la cuota.
-  const filas: Array<[string, number]> = [[`Cuota ${cuota}`, d.monto - interes]];
+  //
+  // MONTO es solo lo que se aplicó a la cuota: el interés NO está adentro, se
+  // suma aparte (ver totalRecibo en api.ts). Antes acá se restaba el interés
+  // del MONTO y el TOTAL salía corto.
+  const filas: Array<[string, number]> = [[`Cuota ${cuota}`, d.monto]];
   if (interes > 0) filas.push(["Intereses por mora", interes]);
 
   const filasHtml = filas
@@ -272,7 +276,7 @@ function construirHtml(d: ReciboDetalle, tipo: TipoRecibo, logoUrl: string): str
 
   <div class="tot">
     <span class="rot">TOTAL RECIBIDO</span>
-    <span class="imp">Gs. ${gs(d.monto)}</span>
+    <span class="imp">Gs. ${gs(totalRecibo(d))}</span>
   </div>
 
   ${
