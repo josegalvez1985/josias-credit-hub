@@ -1,15 +1,21 @@
 # Josias Credit Hub
 
 PWA de Josias Muebles construida con TanStack Start (React 19), TanStack Router,
-Tailwind CSS v4 y backend ORDS/Oracle. Cubre dos circuitos:
+Tailwind CSS v4 y backend ORDS/Oracle. Cubre tres circuitos:
 
 - **Solicitudes** (asesores) — registro y gestión de solicitudes de crédito.
 - **Recibos** (cobradores) — emisión, consulta y anulación de recibos de cobranza.
-  Se está migrando desde una app Oracle APEX, página por página.
-- **Administración** (ERP) — consulta e impresión de créditos otorgados. A
-  diferencia de los otros dos, es de **escritorio**: solo aparece para los
-  usuarios de la lista blanca de [src/lib/permisos.ts](src/lib/permisos.ts) y en
-  pantallas de 1024px o más.
+  Migrado desde una app Oracle APEX, página por página.
+- **Administración** (ERP) — a diferencia de los otros dos, es de **escritorio**:
+  solo aparece para los usuarios de la lista blanca de
+  [src/lib/permisos.ts](src/lib/permisos.ts) y en pantallas de 1024px o más.
+  - *Operaciones → Solicitud de Créditos*: consulta e impresión de créditos
+    otorgados (solo lectura).
+  - *Operaciones → Recibos de Proveedores*: pagos de facturas de compra a
+    crédito. Es la primera sección que escribe en la base; cada endpoint valida
+    el usuario en Oracle.
+  - *Reportes → Saldos de Proveedores*: PDF A4 de lo que se le debe a cada
+    proveedor (solo saldo, con recibos o el estado de cuenta completo).
 
 ## Documentación
 

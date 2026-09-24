@@ -161,8 +161,19 @@ solo por unas pocas personas, y ahí las reglas cambian a propósito.
   márgenes negativos (ver [\_app.admin.tsx](src/routes/_app.admin.tsx)). Si
   cambia el padding de `_app`, hay que acompañarlo ahí.
 
+- **Referencias según el tipo de pantalla:**
+
+  | Qué | Ref |
+  | --- | --- |
+  | Listado de solo lectura, paginado en el servidor | `_app.admin.creditos.index.tsx` |
+  | Listado con pestañas (la pestaña va en la URL, `?tab=`) | `_app.admin.recibos-proveedores.index.tsx` |
+  | Alta con escritura: cabecera + tabla de filas elegibles con monto | `_app.admin.recibos-proveedores.nuevo.tsx` |
+  | Detalle con borrado detrás de un `AlertDialog` | `_app.admin.recibos-proveedores.$id.tsx` |
+  | Reporte: opciones + vista previa + PDF | `_app.admin.reportes.saldos-proveedores.tsx` |
+
 Quién lo ve lo decide [src/lib/permisos.ts](src/lib/permisos.ts): lista blanca de
-usuarios **y** pantalla ≥ 1024 px. Es una barrera de interfaz, no de seguridad.
+usuarios **y** pantalla ≥ 1024 px. Es una barrera de interfaz, no de seguridad:
+la de verdad está en cada handler de Oracle (ver `GUIA-BACKEND.md` §7).
 
 ---
 

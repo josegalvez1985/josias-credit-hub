@@ -176,6 +176,22 @@ En orden, hasta que uno funcione:
   `filtrarLov()` en `src/lib/api.ts`. Si de verdad hace falta filtrar en la base,
   usar otro nombre (`buscar`, `texto`) y declararlo con `ORDS.DEFINE_PARAMETER`.
 
+- **Un array en el body** (cabecera + N filas, como un recibo con varias
+  facturas) va entero al paquete en **una** transacción, no un POST por fila.
+  ORDS no bindea arrays: el handler lee `:body_text` **una sola vez** y el
+  paquete lo recorre con `JSON_TABLE`. Referencia: `pkg_recibos_compra.crear`.
+- **Validar quién llama.** Cuando un módulo exige un usuario de una lista (el
+  administrativo), el arranque común de los handlers se arma una vez en el
+  `DECLARE` del bloque del módulo y se concatena en cada `p_source`. La lista
+  vive también en el paquete y en `src/lib/permisos.ts`: los tres tienen que
+  coincidir. "Sin permiso" responde **400, no 403**, porque `api.ts` toma el
+  403 como sesión vencida y expulsa al login. Referencia: `l_guardia` en
+  `proveedores.sql`.
+- **Un `DELETE` no lleva `Content-Type: application/json`.** Con ese header ORDS
+  intenta parsear el cuerpo antes del handler, el cuerpo no le llega y corta con
+  *"Expected one of: <<{,[,…>> but got: <<EOF>>"* sin ejecutar nada. El cliente
+  lo manda con `text/plain` (`eliminarReciboProveedor` en `api.ts`).
+
 ## Cómo agregar un campo nuevo (checklist)
 
 Ejemplo real: `IND_GARANTE` en las referencias de una solicitud.
@@ -203,6 +219,9 @@ Estas piezas están en la base pero todavía no en este repo:
 - Tablas `SOLICITUD_VENTAS_CABECERA`, `SOLICITUD_VENTAS_DETALLE`,
   `SOLICITUD_VENTAS_ACTIVIDAD_LABORAL`, `CLIENTES`, `ARTICULOS`, `CIUDADES`,
   `VENDEDORES`, `PROFESIONES`, `RELACIONES_PERSONALES`.
+- Tablas de compras y proveedores: `PROVEEDORES`, `COMPRAS_CABECERA`,
+  `COMPRAS_DETALLE`, `RECIBOS_COMPRA_CABECERA`, `RECIBOS_COMPRA_DETALLE`. Su DDL
+  está resumido en la sección 1 de `proveedores.sql`, pero no versionado entero.
 - La vista `V_PRECIOS_VENTAS` (la consume `GET /solicitudes/precios`).
 - El endpoint `/clientes/` que usa el frontend (`GET`, `POST`, `GET /:cod`).
   No está en el módulo `solicitudes`: o es AutoREST sobre la tabla `CLIENTES` o es

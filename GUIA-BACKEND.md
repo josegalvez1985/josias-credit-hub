@@ -166,7 +166,7 @@ la cabecera de [backend/proveedores.sql](backend/proveedores.sql).
 
 | Pieza | Estado |
 | --- | --- |
-| `backend/proveedores.sql` | ✅ desplegado — `pkg_recibos_compra` + módulo ORDS `proveedores`. ⏳ El handler `GET pagos` (2026-09-24, para el reporte) **falta redesplegar**: sección 3.a + 3.b, el paquete no cambió |
+| `backend/proveedores.sql` | ✅ desplegado — `pkg_recibos_compra` + módulo ORDS `proveedores`. ⏳ **Falta redesplegar** dos cambios del 2026-09-24: el paquete (formas de pago nuevas, sección 2) y el módulo (handler `GET pagos` para el reporte, 3.a + 3.b). Antes, correr a mano la 1.a |
 | Cliente HTTP | ✅ hecho — `listarFacturasCompra`, `listarRecibosProveedor`, `obtenerReciboProveedor`, `crearReciboProveedor`, `eliminarReciboProveedor`, `lovProveedores`, `listarPagosFacturas` |
 | Reporte | ✅ hecho — Saldos de Proveedores (Administración → Reportes), ver `GUIA-FRONTEND.md` §10 |
 | Listado | ✅ hecho — [\_app.admin.recibos-proveedores.index.tsx](src/routes/_app.admin.recibos-proveedores.index.tsx), pestañas facturas / recibos |
@@ -188,6 +188,14 @@ Lo que no es obvio:
   `permisos.ts`), y "sin permiso" responde **400, no 403**: `api.ts` trata el
   403 como sesión vencida y manda al login.
 - Sin anulación ni edición: un error se corrige eliminando y volviendo a cargar.
+- **Formas de pago**: E Efectivo · T Transferencia Bancaria · Q QR · D Tarjeta
+  de Débito · C Tarjeta de Crédito. Todas menos efectivo piden nro. de
+  comprobante. ⚠ Hasta el 2026-09-24 la **C era cheque**: un recibo viejo con C
+  se lee hoy como tarjeta de crédito (consulta en la sección 1.a del `.sql`).
+  Los nombres viven en `FORMAS_PAGO` / `COMPROBANTE_DE` de `api.ts`.
+- **Una factura con total 0 no está pagada**: no tiene artículos con precio en
+  `COMPRAS_DETALLE`. Las pantallas la muestran como "Sin monto"
+  (`estadoFactura` en `api.ts`), no como "Pagada".
 
 ### Tres cosas que no hay que perder de vista
 
@@ -203,10 +211,12 @@ alguna vez se agrega escritura, vale la misma regla que en recibos: el código
 **no** toca `VENTAS_CUOTAS` ni calcula vencimientos. El detalle está en la
 cabecera de `backend/operaciones.sql`.
 
-**Los permisos de hoy son de interfaz, no de seguridad.** `permisos.ts` decide
-qué se dibuja; cualquiera que edite el bundle hace aparecer el menú. Cuando
-estas pantallas tengan endpoints de escritura, cada handler tiene que validar
-contra el token quién está llamando (§1.5 de [GUIA-LOGIN.md](GUIA-LOGIN.md)).
+**`permisos.ts` es interfaz, no seguridad.** Decide qué se dibuja; cualquiera
+que edite el bundle hace aparecer el menú. La seguridad está del lado de
+Oracle: todo módulo administrativo con escritura valida en cada handler, contra
+el token, que el usuario esté en la lista. `proveedores` ya lo hace y es la
+referencia (`l_guardia` en `backend/proveedores.sql`); `operaciones`, que es de
+solo lectura, todavía no.
 
 ### La paginación de `operaciones` no es la de `recibos`
 

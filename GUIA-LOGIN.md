@@ -333,6 +333,8 @@ END;
 
 > Si el bind `:authorization` no llega, revisá que ORDS esté pasando el header. En algunas versiones hay que declararlo explícitamente o leerlo con `OWA_UTIL.GET_CGI_ENV('HTTP_AUTHORIZATION')`.
 
+> **Ejemplo real con lista de usuarios:** [backend/proveedores.sql](backend/proveedores.sql) (`l_guardia`) valida el token **y** que el usuario sea del módulo administrativo, en todos sus handlers. Ojo: ahí "sin permiso" responde **400**, no 403. El cliente (`api.ts`) trata 401 y 403 como sesión vencida y manda al login, y un administrador con el permiso mal cargado quedaría rebotando sin entender por qué.
+
 ### 1.6 Endurecer para producción
 
 El handler tal como está funciona, pero conviene ajustar tres cosas:
