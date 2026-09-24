@@ -30,7 +30,11 @@ import { Route as AppRecibosDerivacionesRouteImport } from './routes/_app.recibo
 import { Route as AppRecibosClientesRouteImport } from './routes/_app.recibos.clientes'
 import { Route as AppRecibosCargarUbicacionRouteImport } from './routes/_app.recibos.cargar-ubicacion'
 import { Route as AppClientesNuevoRouteImport } from './routes/_app.clientes.nuevo'
+import { Route as AppAdminRecibosProveedoresIndexRouteImport } from './routes/_app.admin.recibos-proveedores.index'
 import { Route as AppAdminCreditosIndexRouteImport } from './routes/_app.admin.creditos.index'
+import { Route as AppAdminReportesSaldosProveedoresRouteImport } from './routes/_app.admin.reportes.saldos-proveedores'
+import { Route as AppAdminRecibosProveedoresNuevoRouteImport } from './routes/_app.admin.recibos-proveedores.nuevo'
+import { Route as AppAdminRecibosProveedoresIdRouteImport } from './routes/_app.admin.recibos-proveedores.$id'
 import { Route as AppAdminCreditosIdRouteImport } from './routes/_app.admin.creditos.$id'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -139,11 +143,35 @@ const AppClientesNuevoRoute = AppClientesNuevoRouteImport.update({
   path: '/clientes/nuevo',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminRecibosProveedoresIndexRoute =
+  AppAdminRecibosProveedoresIndexRouteImport.update({
+    id: '/recibos-proveedores/',
+    path: '/recibos-proveedores/',
+    getParentRoute: () => AppAdminRoute,
+  } as any)
 const AppAdminCreditosIndexRoute = AppAdminCreditosIndexRouteImport.update({
   id: '/creditos/',
   path: '/creditos/',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppAdminReportesSaldosProveedoresRoute =
+  AppAdminReportesSaldosProveedoresRouteImport.update({
+    id: '/reportes/saldos-proveedores',
+    path: '/reportes/saldos-proveedores',
+    getParentRoute: () => AppAdminRoute,
+  } as any)
+const AppAdminRecibosProveedoresNuevoRoute =
+  AppAdminRecibosProveedoresNuevoRouteImport.update({
+    id: '/recibos-proveedores/nuevo',
+    path: '/recibos-proveedores/nuevo',
+    getParentRoute: () => AppAdminRoute,
+  } as any)
+const AppAdminRecibosProveedoresIdRoute =
+  AppAdminRecibosProveedoresIdRouteImport.update({
+    id: '/recibos-proveedores/$id',
+    path: '/recibos-proveedores/$id',
+    getParentRoute: () => AppAdminRoute,
+  } as any)
 const AppAdminCreditosIdRoute = AppAdminCreditosIdRouteImport.update({
   id: '/creditos/$id',
   path: '/creditos/$id',
@@ -172,7 +200,11 @@ export interface FileRoutesByFullPath {
   '/recibos/': typeof AppRecibosIndexRoute
   '/solicitudes/': typeof AppSolicitudesIndexRoute
   '/admin/creditos/$id': typeof AppAdminCreditosIdRoute
+  '/admin/recibos-proveedores/$id': typeof AppAdminRecibosProveedoresIdRoute
+  '/admin/recibos-proveedores/nuevo': typeof AppAdminRecibosProveedoresNuevoRoute
+  '/admin/reportes/saldos-proveedores': typeof AppAdminReportesSaldosProveedoresRoute
   '/admin/creditos/': typeof AppAdminCreditosIndexRoute
+  '/admin/recibos-proveedores/': typeof AppAdminRecibosProveedoresIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -194,7 +226,11 @@ export interface FileRoutesByTo {
   '/recibos': typeof AppRecibosIndexRoute
   '/solicitudes': typeof AppSolicitudesIndexRoute
   '/admin/creditos/$id': typeof AppAdminCreditosIdRoute
+  '/admin/recibos-proveedores/$id': typeof AppAdminRecibosProveedoresIdRoute
+  '/admin/recibos-proveedores/nuevo': typeof AppAdminRecibosProveedoresNuevoRoute
+  '/admin/reportes/saldos-proveedores': typeof AppAdminReportesSaldosProveedoresRoute
   '/admin/creditos': typeof AppAdminCreditosIndexRoute
+  '/admin/recibos-proveedores': typeof AppAdminRecibosProveedoresIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -220,7 +256,11 @@ export interface FileRoutesById {
   '/_app/recibos/': typeof AppRecibosIndexRoute
   '/_app/solicitudes/': typeof AppSolicitudesIndexRoute
   '/_app/admin/creditos/$id': typeof AppAdminCreditosIdRoute
+  '/_app/admin/recibos-proveedores/$id': typeof AppAdminRecibosProveedoresIdRoute
+  '/_app/admin/recibos-proveedores/nuevo': typeof AppAdminRecibosProveedoresNuevoRoute
+  '/_app/admin/reportes/saldos-proveedores': typeof AppAdminReportesSaldosProveedoresRoute
   '/_app/admin/creditos/': typeof AppAdminCreditosIndexRoute
+  '/_app/admin/recibos-proveedores/': typeof AppAdminRecibosProveedoresIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -246,7 +286,11 @@ export interface FileRouteTypes {
     | '/recibos/'
     | '/solicitudes/'
     | '/admin/creditos/$id'
+    | '/admin/recibos-proveedores/$id'
+    | '/admin/recibos-proveedores/nuevo'
+    | '/admin/reportes/saldos-proveedores'
     | '/admin/creditos/'
+    | '/admin/recibos-proveedores/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -268,7 +312,11 @@ export interface FileRouteTypes {
     | '/recibos'
     | '/solicitudes'
     | '/admin/creditos/$id'
+    | '/admin/recibos-proveedores/$id'
+    | '/admin/recibos-proveedores/nuevo'
+    | '/admin/reportes/saldos-proveedores'
     | '/admin/creditos'
+    | '/admin/recibos-proveedores'
   id:
     | '__root__'
     | '/'
@@ -293,7 +341,11 @@ export interface FileRouteTypes {
     | '/_app/recibos/'
     | '/_app/solicitudes/'
     | '/_app/admin/creditos/$id'
+    | '/_app/admin/recibos-proveedores/$id'
+    | '/_app/admin/recibos-proveedores/nuevo'
+    | '/_app/admin/reportes/saldos-proveedores'
     | '/_app/admin/creditos/'
+    | '/_app/admin/recibos-proveedores/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -452,11 +504,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesNuevoRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/recibos-proveedores/': {
+      id: '/_app/admin/recibos-proveedores/'
+      path: '/recibos-proveedores'
+      fullPath: '/admin/recibos-proveedores/'
+      preLoaderRoute: typeof AppAdminRecibosProveedoresIndexRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
     '/_app/admin/creditos/': {
       id: '/_app/admin/creditos/'
       path: '/creditos'
       fullPath: '/admin/creditos/'
       preLoaderRoute: typeof AppAdminCreditosIndexRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/reportes/saldos-proveedores': {
+      id: '/_app/admin/reportes/saldos-proveedores'
+      path: '/reportes/saldos-proveedores'
+      fullPath: '/admin/reportes/saldos-proveedores'
+      preLoaderRoute: typeof AppAdminReportesSaldosProveedoresRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/recibos-proveedores/nuevo': {
+      id: '/_app/admin/recibos-proveedores/nuevo'
+      path: '/recibos-proveedores/nuevo'
+      fullPath: '/admin/recibos-proveedores/nuevo'
+      preLoaderRoute: typeof AppAdminRecibosProveedoresNuevoRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/recibos-proveedores/$id': {
+      id: '/_app/admin/recibos-proveedores/$id'
+      path: '/recibos-proveedores/$id'
+      fullPath: '/admin/recibos-proveedores/$id'
+      preLoaderRoute: typeof AppAdminRecibosProveedoresIdRouteImport
       parentRoute: typeof AppAdminRoute
     }
     '/_app/admin/creditos/$id': {
@@ -472,13 +552,22 @@ declare module '@tanstack/react-router' {
 interface AppAdminRouteChildren {
   AppAdminIndexRoute: typeof AppAdminIndexRoute
   AppAdminCreditosIdRoute: typeof AppAdminCreditosIdRoute
+  AppAdminRecibosProveedoresIdRoute: typeof AppAdminRecibosProveedoresIdRoute
+  AppAdminRecibosProveedoresNuevoRoute: typeof AppAdminRecibosProveedoresNuevoRoute
+  AppAdminReportesSaldosProveedoresRoute: typeof AppAdminReportesSaldosProveedoresRoute
   AppAdminCreditosIndexRoute: typeof AppAdminCreditosIndexRoute
+  AppAdminRecibosProveedoresIndexRoute: typeof AppAdminRecibosProveedoresIndexRoute
 }
 
 const AppAdminRouteChildren: AppAdminRouteChildren = {
   AppAdminIndexRoute: AppAdminIndexRoute,
   AppAdminCreditosIdRoute: AppAdminCreditosIdRoute,
+  AppAdminRecibosProveedoresIdRoute: AppAdminRecibosProveedoresIdRoute,
+  AppAdminRecibosProveedoresNuevoRoute: AppAdminRecibosProveedoresNuevoRoute,
+  AppAdminReportesSaldosProveedoresRoute:
+    AppAdminReportesSaldosProveedoresRoute,
   AppAdminCreditosIndexRoute: AppAdminCreditosIndexRoute,
+  AppAdminRecibosProveedoresIndexRoute: AppAdminRecibosProveedoresIndexRoute,
 }
 
 const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(

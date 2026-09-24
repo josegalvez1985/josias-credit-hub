@@ -22,6 +22,10 @@ import { useAuth } from "./auth";
 // el bundle puede hacer aparecer el menú. Cuando el módulo administrativo tenga
 // endpoints propios, cada uno tiene que validar el permiso del lado de Oracle
 // contra el token — la lista de acá solo decide qué se dibuja.
+//
+// ⚠ La misma lista está en backend/proveedores.sql (pkg_recibos_compra.es_admin
+// y l_admins del módulo). Un usuario agregado solo acá ve el menú pero Oracle
+// le rechaza cada pedido de Recibos de Proveedores.
 const USUARIOS_ADMIN = ["AAQUINO", "AGONZALEZ", "JOSEG"] as const;
 
 export function esUsuarioAdmin(username?: string | null): boolean {

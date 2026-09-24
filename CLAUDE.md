@@ -14,9 +14,17 @@ la query de un LOV, un trigger o una validación, **hay que pedirlo antes de esc
 no inventar ni asumir. La lista de qué pedir está en `GUIA-BACKEND.md` §2.
 
 El módulo de Recibos ya está completo (las 6 secciones del menú de APEX). La línea de trabajo
-abierta es el **módulo administrativo** (`/admin/*`, ERP): créditos otorgados, de escritorio y
-por ahora **solo lectura** — `VENTAS_CABECERA` tiene cinco triggers que regeneran el plan de
-cuotas. Ver `GUIA-BACKEND.md` §7.
+abierta es el **módulo administrativo** (`/admin/*`, ERP), de escritorio:
+
+- **Créditos otorgados**: **solo lectura** — `VENTAS_CABECERA` tiene cinco triggers que
+  regeneran el plan de cuotas.
+- **Recibos de Proveedores**: el primero **con escritura** (`backend/proveedores.sql`). Valida
+  token y lista de usuarios en Oracle en cada handler.
+- **Reportes**: Saldos de Proveedores, PDF A4, con tres alcances (solo saldo / con recibos /
+  todos). Sin módulo propio: usa los GET de `proveedores` (`facturas` y `pagos`).
+  Ver `GUIA-FRONTEND.md` §10.
+
+Ver `GUIA-BACKEND.md` §7.
 
 ## Guías (leer la que corresponda antes de tocar código)
 
@@ -44,6 +52,7 @@ o un listado, releer esta tabla.** El síntoma casi nunca apunta a la causa.
 | Las tarjetas se salen de la pantalla | Flex items y grid tracks tienen **`min-width: auto`** | `grid-cols-1` (no `grid` pelado) + `min-w-0` donde se trunca. `GUIA-FRONTEND.md` §9 |
 | Un cambio no aparece en el navegador | **Service worker** sirviendo la versión cacheada | Application → Service Workers → Unregister → Ctrl+Shift+R |
 | El endpoint devuelve 500 pero el SQL está bien | Un **GET que llama a un paquete `INVALID`** | Los handlers de lectura van con SQL puro, sin paquetes |
+| *"Expected one of: <<{,[,",number,true,false,null>> but got: <<EOF>>"* en un `DELETE` | `request()` manda siempre `Content-Type: application/json` y **ORDS parsea el cuerpo antes del handler**. En un `DELETE` el cuerpo no le llega (mandar `"{}"` **no** lo arregla) y falla sin ejecutar nada | El `DELETE` va con `Content-Type: text/plain` y sin cuerpo. Ver `eliminarReciboProveedor` en `api.ts` |
 | Un feed devuelve `items: []` sin ningún error | Se mandó `limit`/`offset` a un handler **`json/query`**, donde esos parámetros no existen. Solo los `plsql/block` los declaran como binds propios | `json/query` pagina con **`?page=N`** y avisa que hay más con un link `next` (no con `hasMore`). Ver `listarCreditos` en `api.ts` |
 
 **Y la regla que las engloba a todas:** cuando algo falla, **mirar cómo lo resuelve el código que ya
@@ -58,6 +67,9 @@ salieron de no hacerlo.
   módulo ORDS, todo junto. No hay carpeta `migrations/`. La base **está en producción**, así que
   los `ALTER`/`DROP` van comentados en la sección 1 y se aplican a mano.
 - Booleanos en la base son `'S'` / `'N'`. Fechas viajan como string `YYYY-MM-DD`; vacío → ORA-01841.
+- Fechas en pantalla con `fechaPy()` y "hoy" con `hoyISO()` (`src/lib/utils.ts`), **nunca**
+  `new Date("YYYY-MM-DD")`: es UTC y en Paraguay muestra el día anterior.
+- Un 401/403 **expulsa al login** (`api.ts`). "No tenés permiso" responde 400 con mensaje.
 - Montos en guaraníes, sin decimales, y en créditos se redondean hacia arriba a múltiplos de 10.000.
 - ORDS pagina de a 25: todo feed se recorre con `limit=500&offset=`.
 - Un `200` con `{"success": false}` es un error.

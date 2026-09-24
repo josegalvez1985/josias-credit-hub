@@ -156,7 +156,38 @@ Créditos Otorgados). Es una línea de trabajo distinta a la de cobranzas: se us
 | Listado | ✅ hecho — [\_app.admin.creditos.index.tsx](src/routes/_app.admin.creditos.index.tsx) |
 | Detalle | ✅ hecho — [\_app.admin.creditos.$id.tsx](src/routes/_app.admin.creditos.$id.tsx) |
 | Impresos | ✅ solicitud y pagaré — `impresion-solicitud.ts`, `impresion-pagare.ts` |
-| Permisos | ⚠️ lista blanca en el cliente ([src/lib/permisos.ts](src/lib/permisos.ts)) — **falta la validación en Oracle** |
+| Permisos | ⚠️ lista blanca en el cliente ([src/lib/permisos.ts](src/lib/permisos.ts)) — `operaciones` no valida en Oracle; `proveedores` sí (ver abajo) |
+
+### Recibos de Proveedores (2026-09-24)
+
+Pagos a proveedores por facturas de compra a crédito. No migra una página de
+APEX: las tablas `RECIBOS_COMPRA_*` son nuevas. Las reglas de negocio están en
+la cabecera de [backend/proveedores.sql](backend/proveedores.sql).
+
+| Pieza | Estado |
+| --- | --- |
+| `backend/proveedores.sql` | ✅ desplegado — `pkg_recibos_compra` + módulo ORDS `proveedores`. ⏳ El handler `GET pagos` (2026-09-24, para el reporte) **falta redesplegar**: sección 3.a + 3.b, el paquete no cambió |
+| Cliente HTTP | ✅ hecho — `listarFacturasCompra`, `listarRecibosProveedor`, `obtenerReciboProveedor`, `crearReciboProveedor`, `eliminarReciboProveedor`, `lovProveedores`, `listarPagosFacturas` |
+| Reporte | ✅ hecho — Saldos de Proveedores (Administración → Reportes), ver `GUIA-FRONTEND.md` §10 |
+| Listado | ✅ hecho — [\_app.admin.recibos-proveedores.index.tsx](src/routes/_app.admin.recibos-proveedores.index.tsx), pestañas facturas / recibos |
+| Alta | ✅ hecha — [\_app.admin.recibos-proveedores.nuevo.tsx](src/routes/_app.admin.recibos-proveedores.nuevo.tsx) |
+| Detalle y baja | ✅ hecho — [\_app.admin.recibos-proveedores.$id.tsx](src/routes/_app.admin.recibos-proveedores.$id.tsx) |
+
+Lo que no es obvio:
+
+- **Factura a crédito = `COMPRAS_CABECERA` con `TIPO = 'C'` y `CONDICION_COMPRA = 2`.**
+  `TIPO 'S'` es inventario.
+- **La factura no guarda su monto.** El total es `ROUND(SUM(cantidad × precio_unitario))`
+  de `COMPRAS_DETALLE` y el saldo es total − lo aplicado. Los dos se calculan
+  siempre; por eso eliminar un recibo devuelve el saldo sin tocar nada más.
+- **El alta es una sola transacción**: el POST lleva la cabecera y el array de
+  facturas, y el paquete lo lee de `:body_text` con `JSON_TABLE`. Las facturas
+  se bloquean con `FOR UPDATE` en orden de ID para que dos recibos simultáneos
+  no las paguen de más.
+- **La lista de usuarios está en tres lugares** (paquete, bloque del módulo y
+  `permisos.ts`), y "sin permiso" responde **400, no 403**: `api.ts` trata el
+  403 como sesión vencida y manda al login.
+- Sin anulación ni edición: un error se corrige eliminando y volviendo a cargar.
 
 ### Tres cosas que no hay que perder de vista
 

@@ -18,6 +18,7 @@ Todo lo que necesita ese endpoint está en su archivo, no hay que saltar entre c
 | `recibos.sql` | `/recibos/*` | `pkg_recibos` + módulo ORDS `recibos` (listado, alta, edición, anulación, LOVs) |
 | `consultas.sql` | `/consultas/*` | módulo ORDS `consultas` — ficha de cliente (pág. 10). Sin paquete: es lectura pura. Nació para sacar `cliente/:cod_cliente` fuera de `recibos`, que respondía sin cabeceras CORS |
 | `operaciones.sql` | `/operaciones/*` | módulo ORDS `operaciones` — créditos otorgados (pág. 18 de APEX). **Solo lectura y sin paquete**: SQL puro. Alimenta el módulo administrativo |
+| `proveedores.sql` | `/proveedores/*` | `pkg_recibos_compra` + módulo ORDS `proveedores` — recibos de pago a proveedores por facturas de compra a crédito. Primer módulo administrativo **con escritura**: valida token y lista de usuarios en cada handler |
 
 **Todo lo de un módulo va en su archivo**, incluidos los cambios de esquema.
 No hay carpeta `migrations/`: los `ALTER`/`DROP` van en una sección de saneamiento

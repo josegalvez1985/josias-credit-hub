@@ -214,8 +214,12 @@ formatCurrency(1500000)  // "₲ 1.500.000"  — de @/lib/credit-applications, P
   Ver el helper `fmtMiles` en `solicitudes.nueva`.
 - **Redondeo**: los montos de crédito se redondean **hacia arriba a múltiplos de 10.000**
   (`Math.ceil(monto / 10000) * 10000`). Confirmar con Jose si aplica también a recibos.
-- **Fechas**: a la API van como `YYYY-MM-DD` (string); en pantalla
-  `toLocaleDateString("es-PY", { day: "2-digit", month: "short", year: "numeric" })`.
+- **Fechas**: a la API van como `YYYY-MM-DD` (string); en pantalla con
+  `fechaPy()` de [src/lib/utils.ts](src/lib/utils.ts), y "hoy" con `hoyISO()`.
+  **No** `new Date("2026-09-22").toLocaleDateString(...)`: un string `YYYY-MM-DD`
+  se interpreta como medianoche UTC y en Paraguay (UTC-3) muestra el **día
+  anterior**. Por lo mismo, `toISOString().slice(0, 10)` da mañana después de
+  las 21:00. Varias pantallas viejas todavía tienen ese `formatDate`.
   Un string vacío en una fecha revienta el `TO_DATE` de ORDS con ORA-01841 → mandar `null`.
 - **Booleanos**: en la base son `'S'`/`'N'`, no `true`/`false`.
 
@@ -305,6 +309,29 @@ Convenciones que comparten y conviene no romper:
 - La barra de acciones lleva `.noprint` / `@media print { display: none }`.
 - Se abren con `document.write` sobre una pestaña nueva, no con un blob URL: con
   blob el logo (ruta relativa) no resuelve, y Safari en iOS las bloquea.
+
+**Reportes (A4 vertical, varias hojas)** — misma cara y mismo mecanismo que los
+documentos en hoja (logo, tabla con encabezado oscuro, `@page { margin: 0 }`,
+`document.write`), con tres diferencias:
+
+| Reporte | Archivo | Pantalla |
+| --- | --- | --- |
+| Saldos de Proveedores | [reporte-saldos-proveedores.ts](src/lib/reporte-saldos-proveedores.ts) | Administración → Reportes |
+
+- **Margen en todas las hojas.** Con `@page` en cero, el padding de `.hoja` solo
+  da margen arriba de la primera hoja y abajo de la última. Las hojas del medio
+  lo toman de una fila `.margen` de 10 mm en el `thead` y en el `tfoot`, que el
+  navegador repite en cada hoja (junto con los títulos de columna). Medido en
+  el PDF: los títulos quedan a 10 mm del borde superior de la hoja 2 en adelante.
+- **La pestaña se abre dentro del click, antes de pedir los datos**, con un
+  "Generando..." que después se reemplaza. Si se abre después del `await`, el
+  bloqueador de ventanas emergentes la frena cuando la consulta tarda.
+- **No abre el diálogo de impresión solo**: un reporte primero se mira.
+
+Saldos de Proveedores tiene tres alcances: **Solo saldo** (facturas con saldo),
+**Con recibos** (esas, con los recibos debajo de cada una) y **Todos** (también
+las canceladas: el estado de cuenta). Los recibos salen de `GET /proveedores/pagos`
+y solo van en el detalle, por eso "Con recibos" deja el detalle fijo.
 
 Detalle de las vías del ticket y del error de Windows con la térmica USB en
 [GUIA-IMPRESION-USB.md](GUIA-IMPRESION-USB.md).

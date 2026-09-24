@@ -1,5 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { FileSpreadsheet, LayoutGrid, Receipt, type LucideIcon } from "lucide-react";
+import {
+  ChartColumn,
+  FileChartColumn,
+  FileSpreadsheet,
+  HandCoins,
+  LayoutGrid,
+  Receipt,
+  type LucideIcon,
+} from "lucide-react";
 import { useAdmin } from "@/lib/permisos";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +46,25 @@ export const GRUPOS_ADMIN: GrupoAdmin[] = [
         label: "Solicitud de Créditos",
         descripcion: "Consulta e impresión de créditos otorgados",
         icon: FileSpreadsheet,
+      },
+      {
+        to: "/admin/recibos-proveedores",
+        label: "Recibos de Proveedores",
+        descripcion: "Pagos de facturas de compra a crédito",
+        icon: HandCoins,
+      },
+    ],
+  },
+  {
+    id: "reportes",
+    label: "Reportes",
+    icon: ChartColumn,
+    secciones: [
+      {
+        to: "/admin/reportes/saldos-proveedores",
+        label: "Saldos de Proveedores",
+        descripcion: "PDF de lo que se le debe a cada proveedor",
+        icon: FileChartColumn,
       },
     ],
   },

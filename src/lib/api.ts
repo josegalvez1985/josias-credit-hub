@@ -827,3 +827,191 @@ export async function crearSolicitud(s: SolicitudCompleta): Promise<{ id: number
 
   return { id };
 }
+
+// ----- Recibos de proveedores (modulo ORDS "proveedores") -----
+//
+// Pagos a proveedores por facturas de compra a credito (backend/proveedores.sql).
+// Es la primera seccion del modulo administrativo que ESCRIBE en la base.
+//
+// ⚠ Estos handlers son plsql/block que devuelven TODAS las filas de una vez:
+// no aceptan ?limit/?offset (como recibos) ni ?page (como operaciones). Son
+// pocas filas y aca se filtran y buscan en memoria.
+//
+// Todos validan el token y la lista de usuarios del modulo en Oracle. Un
+// usuario sin permiso recibe 400 con mensaje, no 403, para que request() no lo
+// expulse al login.
+
+// Formas de pago de RECIBOS_COMPRA_CABECERA.FORMA_PAGO (VARCHAR2(1), sin
+// CHECK: las valida pkg_recibos_compra.crear). El orden es el de los botones.
+// ⚠ Hasta el 2026-09-24 la C era CHEQUE; ahora es tarjeta de crédito.
+export type FormaPago = "E" | "T" | "Q" | "D" | "C";
+
+export const FORMAS_PAGO: Record<FormaPago, string> = {
+  E: "Efectivo",
+  T: "Transferencia Bancaria",
+  Q: "QR",
+  D: "Tarjeta de Débito",
+  C: "Tarjeta de Crédito",
+};
+
+// Cómo se llama el nro. de comprobante en cada forma de pago. Es obligatorio en
+// todas menos efectivo, que no lleva (null).
+export const COMPROBANTE_DE: Record<FormaPago, string | null> = {
+  E: null,
+  T: "Nro. de transferencia",
+  Q: "Nro. de operación QR",
+  D: "Nro. de voucher",
+  C: "Nro. de voucher",
+};
+
+// Factura de compra a credito (COMPRAS_CABECERA con TIPO 'C' y CONDICION_COMPRA 2).
+// La tabla no guarda el monto: `total` es SUM(cantidad * precio_unitario) de
+// COMPRAS_DETALLE y `saldo` es total - lo aplicado en recibos. Los dos los
+// calcula Oracle en cada consulta.
+export type FacturaCompra = {
+  id_cabecera: number;
+  referencia?: string; // nro. de factura del proveedor; hay facturas sin el
+  fecha?: string; // YYYY-MM-DD
+  motivo?: string;
+  cod_proveedor?: number;
+  proveedor?: string;
+  documento?: string;
+  observacion?: string;
+  total: number;
+  pagado: number;
+  saldo: number;
+  cant_recibos: number;
+};
+
+// Estado de una factura según sus montos. La usan el listado, el PDF de saldos
+// y su vista previa, para que las tres digan lo mismo.
+//
+// Ojo con `sin_monto`: una factura con total 0 NO está pagada. El total sale de
+// COMPRAS_DETALLE, así que 0 quiere decir que la factura no tiene artículos
+// cargados (o los tiene sin cantidad/precio): no hay nada que pagar ni pagado.
+// Antes se la marcaba "Pagada" porque su saldo también da 0.
+export type EstadoFacturaCompra = "sin_monto" | "pagada" | "parcial" | "pendiente";
+
+export function estadoFactura(f: { total: number; pagado: number; saldo: number }): EstadoFacturaCompra {
+  if (f.total <= 0) return "sin_monto";
+  if (f.saldo <= 0) return "pagada";
+  if (f.pagado > 0) return "parcial";
+  return "pendiente";
+}
+
+export type ReciboProveedor = {
+  id_recibo: number;
+  nro_recibo: string;
+  fecha: string; // YYYY-MM-DD
+  cod_proveedor: number;
+  proveedor?: string;
+  documento?: string;
+  forma_pago?: FormaPago;
+  nro_comprobante?: string;
+  monto_total: number;
+  observacion?: string;
+  cant_facturas: number;
+  facturas?: string; // nros. de factura separados por coma
+};
+
+export type ReciboProveedorFactura = {
+  id_detalle: number;
+  id_cabecera: number;
+  referencia?: string;
+  fecha?: string;
+  total: number;
+  monto_aplicado: number;
+  saldo: number; // el saldo de HOY, no el del momento del pago
+};
+
+export type ReciboProveedorDetalle = Omit<ReciboProveedor, "cant_facturas" | "facturas"> & {
+  facturas: ReciboProveedorFactura[];
+};
+
+export type ProveedorLov = LovItem & {
+  documento?: string;
+  pendientes: number; // facturas con saldo
+  saldo: number; // suma de esos saldos
+};
+
+export type ReciboProveedorInput = {
+  cod_proveedor: number;
+  nro_recibo: string;
+  fecha: string; // YYYY-MM-DD
+  forma_pago: FormaPago;
+  nro_comprobante?: string; // obligatorio salvo en efectivo (ver COMPROBANTE_DE)
+  observacion?: string;
+  facturas: { id_cabecera: number; monto_aplicado: number }[];
+};
+
+export function listarFacturasCompra(f: { codProveedor?: number; pendientes?: boolean } = {}) {
+  const qs = new URLSearchParams();
+  if (f.codProveedor) qs.set("cod_proveedor", String(f.codProveedor));
+  if (f.pendientes) qs.set("pendientes", "S");
+  const s = qs.toString();
+  return request<{ items: FacturaCompra[] }>(`/proveedores/facturas${s ? `?${s}` : ""}`).then(
+    (r) => r.items ?? [],
+  );
+}
+
+export function listarRecibosProveedor(f: { codProveedor?: number } = {}) {
+  const qs = f.codProveedor ? `?cod_proveedor=${f.codProveedor}` : "";
+  return request<{ items: ReciboProveedor[] }>(`/proveedores/recibos${qs}`).then(
+    (r) => r.items ?? [],
+  );
+}
+
+export function obtenerReciboProveedor(id: number) {
+  return request<ReciboProveedorDetalle>(`/proveedores/recibos/${id}`);
+}
+
+// Cabecera y facturas viajan juntas y el paquete las graba en UNA transaccion:
+// no es el patron de crearSolicitud (un POST por hijo), que puede dejar datos
+// a medias. MONTO_TOTAL no se manda: lo calcula Oracle con la suma del detalle.
+export function crearReciboProveedor(r: ReciboProveedorInput) {
+  return request<{ id_recibo: number }>("/proveedores/recibos", {
+    method: "POST",
+    body: JSON.stringify(r),
+  });
+}
+
+// No hay anulacion: para corregir se elimina y se vuelve a cargar. El saldo de
+// las facturas vuelve solo porque es calculado.
+//
+// ⚠ El Content-Type text/plain no sobra. request() manda siempre
+// application/json, y con ese header ORDS intenta parsear el cuerpo del DELETE
+// ANTES de llegar al handler. El cuerpo no le llega —ni vacio ni con "{}", se
+// probaron los dos el 2026-09-24— y corta con "Expected one of:
+// <<{,[,",number,true,false,null>> but got: <<EOF>>" sin ejecutar nada.
+// Con text/plain ORDS no parsea, y el handler solo necesita :id y el token.
+export function eliminarReciboProveedor(id: number) {
+  return request(`/proveedores/recibos/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "text/plain" },
+  });
+}
+
+// Una factura pagada en un recibo: una fila por cada par recibo/factura. Es lo
+// que el reporte de saldos lista debajo de cada factura en "Con recibos" y
+// "Todos". Los montos aplicados de una factura suman su `pagado`.
+export type PagoFactura = {
+  id_detalle: number;
+  id_cabecera: number;
+  monto_aplicado: number;
+  id_recibo: number;
+  nro_recibo: string;
+  fecha: string; // YYYY-MM-DD, la del recibo
+  forma_pago?: FormaPago;
+  nro_comprobante?: string;
+};
+
+export function listarPagosFacturas(f: { codProveedor?: number } = {}) {
+  const qs = f.codProveedor ? `?cod_proveedor=${f.codProveedor}` : "";
+  return request<{ items: PagoFactura[] }>(`/proveedores/pagos${qs}`).then((r) => r.items ?? []);
+}
+
+// Solo proveedores con alguna factura a credito. La busqueda va en el cliente.
+export async function lovProveedores(q?: string): Promise<ProveedorLov[]> {
+  const r = await request<{ items: ProveedorLov[] }>("/proveedores/lov/proveedores");
+  return filtrarLov(r.items ?? [], q);
+}
