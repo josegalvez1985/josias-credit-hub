@@ -64,10 +64,10 @@ function Derivaciones() {
     [cliente],
   );
 
-  // A diferencia de recibos, acá el LOV solo trae cuotas con saldo pendiente:
-  // es el filtro `and nvl(saldo_cuota,0) <> 0` de la página 4.
+  // Solo cuotas con saldo pendiente: es el filtro `and nvl(saldo_cuota,0) <> 0`
+  // de la página 4.
   const fetchCuotas = useCallback(
-    async (q?: string) => (solicitud ? filtrarLov(await lovRecibos.cuotas(solicitud.value, true), q) : []),
+    async (q?: string) => (solicitud ? filtrarLov(await lovRecibos.cuotas(solicitud.value), q) : []),
     [solicitud],
   );
 

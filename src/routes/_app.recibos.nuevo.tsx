@@ -250,7 +250,7 @@ function NuevoRecibo() {
               onSelect={elegirCliente}
             />
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Solo aparecen clientes con cuotas pendientes.
+              Solo aparecen clientes, solicitudes y cuotas con saldo pendiente.
             </p>
           </Field>
 

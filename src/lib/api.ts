@@ -473,15 +473,19 @@ export const lovRecibos = {
   // Todos los clientes, sin filtro de deuda. Es el LOV de ubicaciones (pág. 5).
   clientesTodos: (q?: string) =>
     todosLosClientes("/recibos/lov/clientes-todos").then((all) => filtrarLov(all, q)),
+  // Solo solicitudes con saldo: los dos que usan este LOV (alta de recibo y
+  // derivaciones) trabajan sobre cuotas pendientes, y una solicitud ya pagada
+  // lleva a un LOV de cuotas vacío. Se filtra acá con el saldo_total que ya
+  // trae el handler, así no hace falta redesplegar el módulo `recibos`.
   solicitudes: (codCliente: number) =>
     request<OrdsFeed<LovItem & { nro_solicitud: number; saldo_total: number }>>(
       `/recibos/lov/solicitudes/${codCliente}?limit=500`,
-    ).then((r) => r.items ?? []),
-  // conSaldo deja solo las cuotas con saldo pendiente: así lo hace el LOV de
-  // derivaciones (página 4). El de recibos (página 3) las trae todas.
-  cuotas: (idSolicitud: number, conSaldo = false) =>
+    ).then((r) => (r.items ?? []).filter((s) => Number(s.saldo_total) !== 0)),
+  // Solo cuotas con saldo pendiente: es el filtro `nvl(saldo_cuota,0) <> 0`
+  // del LOV de derivaciones (página 4), que ahora aplica también al alta.
+  cuotas: (idSolicitud: number) =>
     request<OrdsFeed<CuotaLov>>(
-      `/recibos/lov/cuotas/${idSolicitud}?limit=500${conSaldo ? "&con_saldo=S" : ""}`,
+      `/recibos/lov/cuotas/${idSolicitud}?limit=500&con_saldo=S`,
     ).then((r) => r.items ?? []),
 };
 
