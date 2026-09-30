@@ -22,3 +22,12 @@ export function hoyISO(): string {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
+
+// "2026-09-22" (o "2026-09-22T00:00:00Z", como manda ORDS una columna DATE sin
+// TO_CHAR) -> Date a la medianoche LOCAL de ese día. Para los formatos que
+// fechaPy no da, como el mes abreviado ("22 sept."): se arma con los
+// componentes y no con `new Date(iso)`, que caería en el día anterior.
+export function fechaLocal(iso?: string | null): Date | null {
+  const m = iso ? /^(\d{4})-(\d{2})-(\d{2})/.exec(iso) : null;
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+}

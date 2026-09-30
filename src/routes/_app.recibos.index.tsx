@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ReciboAcciones, ticketDesdeRecibo } from "@/components/recibo-acciones";
-import { cn } from "@/lib/utils";
+import { cn, fechaPy } from "@/lib/utils";
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined;
 const PAGINA = 50;
@@ -204,7 +204,7 @@ function RecibosPage() {
                           </button>
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">{r.nro_recibo}</TableCell>
-                        <TableCell className="whitespace-nowrap">{formatDate(r.fecha_recibo)}</TableCell>
+                        <TableCell className="whitespace-nowrap">{fechaPy(r.fecha_recibo)}</TableCell>
                         <TableCell className="max-w-[22rem]">
                           <div className="flex items-center gap-1.5">
                             <span className={cn("min-w-0 truncate font-medium", anulado && "line-through")}>
@@ -319,7 +319,7 @@ function ReciboCard({ recibo: r, onVer }: { recibo: Recibo; onVer: () => void })
               {r.nro_cuota === 0 ? "Entrega inicial" : `Cuota ${r.nro_cuota}`}
             </span>
             <span aria-hidden>·</span>
-            <span className="whitespace-nowrap">{formatDate(r.fecha_recibo)}</span>
+            <span className="whitespace-nowrap">{fechaPy(r.fecha_recibo)}</span>
           </div>
         </div>
       </div>
@@ -378,7 +378,7 @@ function DetalleDialog({ nroRecibo, onClose }: { nroRecibo: number | null; onClo
             </div>
 
             <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-              <Row label="Fecha" value={formatDate(detalle.fecha_recibo)} />
+              <Row label="Fecha" value={fechaPy(detalle.fecha_recibo)} />
               <Row label="Cliente" value={detalle.razon_social} />
               <Row label="Documento" value={detalle.documento} />
               <Row label="Teléfono" value={detalle.nro_telefono} />
@@ -387,7 +387,7 @@ function DetalleDialog({ nroRecibo, onClose }: { nroRecibo: number | null; onClo
                 label="Cuota"
                 value={detalle.cuota_texto ?? (detalle.nro_cuota === 0 ? "Entrega inicial" : String(detalle.nro_cuota))}
               />
-              <Row label="Vencimiento" value={detalle.fec_vencimiento ? formatDate(detalle.fec_vencimiento) : undefined} />
+              <Row label="Vencimiento" value={detalle.fec_vencimiento ? fechaPy(detalle.fec_vencimiento) : undefined} />
               <Row label="Monto de la cuota" value={detalle.monto_cuota != null ? formatCurrency(detalle.monto_cuota) : undefined} />
               <Row label="Saldo previo" value={detalle.saldo_cuota != null ? formatCurrency(detalle.saldo_cuota) : undefined} />
               <Row label="Pago a la cuota" value={formatCurrency(detalle.monto)} />
@@ -427,10 +427,4 @@ function Row({ label, value }: { label: string; value?: string | number }) {
       <span className="text-right text-sm font-medium">{value || "—"}</span>
     </div>
   );
-}
-
-function formatDate(d: string) {
-  const date = new Date(d);
-  if (isNaN(date.getTime())) return d;
-  return date.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" });
 }

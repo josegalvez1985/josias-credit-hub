@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Search, FilePlus, FileText, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { listarCabeceras, nombresClientes, type Cabecera } from "@/lib/api";
 import { formatCurrency } from "@/lib/credit-applications";
+import { fechaLocal } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,7 @@ function ApplicationsList() {
       .then(async (cabs) => {
         const ordenadas = [...cabs].sort(
           (a, b) =>
-            new Date(b.fecha_factura).getTime() - new Date(a.fecha_factura).getTime() ||
+            (b.fecha_factura ?? "").localeCompare(a.fecha_factura ?? "") ||
             b.id - a.id,
         );
         setItems(ordenadas);
@@ -175,7 +176,7 @@ function ApplicationsList() {
 }
 
 function formatDate(d: string) {
-  const date = new Date(d);
-  if (isNaN(date.getTime())) return d;
+  const date = fechaLocal(d);
+  if (!date) return d;
   return date.toLocaleDateString("es-PY", { day: "2-digit", month: "short" });
 }

@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { fechaPy, hoyISO } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/recibos/derivaciones")({
   head: () => ({
@@ -39,13 +40,11 @@ export const Route = createFileRoute("/_app/recibos/derivaciones")({
 
 type Opcion = { value: number; label: string };
 
-const hoy = () => new Date().toISOString().slice(0, 10);
-
 function Derivaciones() {
   const [cliente, setCliente] = useState<Opcion | null>(null);
   const [solicitud, setSolicitud] = useState<Opcion | null>(null);
   const [cuota, setCuota] = useState<CuotaLov | null>(null);
-  const [fecha, setFecha] = useState(hoy);
+  const [fecha, setFecha] = useState(hoyISO);
   const [guardando, setGuardando] = useState(false);
   const [confirmar, setConfirmar] = useState(false);
 
@@ -74,7 +73,7 @@ function Derivaciones() {
 
   // La página 4 limpia todo al abrirse (acción dinámica "Nuevo").
   useEffect(() => {
-    setFecha(hoy());
+    setFecha(hoyISO());
   }, []);
 
   function onSubmit(e: FormEvent) {
@@ -166,7 +165,7 @@ function Derivaciones() {
               <Dato label="Saldo de la cuota" value={formatCurrency(cuota.saldo_cuota)} />
               <Dato
                 label="Fecha de vencimiento"
-                value={cuota.fec_vencimiento ? formatFecha(cuota.fec_vencimiento) : "—"}
+                value={cuota.fec_vencimiento ? fechaPy(cuota.fec_vencimiento) : "—"}
               />
             </div>
 
@@ -177,7 +176,7 @@ function Derivaciones() {
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning-foreground" />
                 <p className="text-sm text-warning-foreground">
                   Esta cuota ya fue derivada el{" "}
-                  <span className="font-medium">{formatFecha(cuota.fec_derivacion)}</span>. Si
+                  <span className="font-medium">{fechaPy(cuota.fec_derivacion)}</span>. Si
                   guardás, se reemplaza esa fecha.
                 </p>
               </div>
@@ -210,7 +209,7 @@ function Derivaciones() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Está seguro de guardar esta derivación?</AlertDialogTitle>
             <AlertDialogDescription>
-              {cliente?.label} · {cuota?.label} · {formatFecha(fecha)}
+              {cliente?.label} · {cuota?.label} · {fechaPy(fecha)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -258,10 +257,4 @@ function Dato({ label, value }: { label: string; value: string }) {
       <span className="text-right text-sm font-medium">{value}</span>
     </div>
   );
-}
-
-function formatFecha(d: string) {
-  const date = new Date(d);
-  if (isNaN(date.getTime())) return d;
-  return date.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" });
 }

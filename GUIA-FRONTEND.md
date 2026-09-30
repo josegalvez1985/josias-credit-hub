@@ -227,10 +227,15 @@ formatCurrency(1500000)  // "₲ 1.500.000"  — de @/lib/credit-applications, P
   (`Math.ceil(monto / 10000) * 10000`). Confirmar con Jose si aplica también a recibos.
 - **Fechas**: a la API van como `YYYY-MM-DD` (string); en pantalla con
   `fechaPy()` de [src/lib/utils.ts](src/lib/utils.ts), y "hoy" con `hoyISO()`.
+  Si hace falta otro formato (mes abreviado, "30 sept."), `fechaLocal()` da el
+  `Date` a medianoche local y sobre ese se llama `toLocaleDateString`.
   **No** `new Date("2026-09-22").toLocaleDateString(...)`: un string `YYYY-MM-DD`
   se interpreta como medianoche UTC y en Paraguay (UTC-3) muestra el **día
   anterior**. Por lo mismo, `toISOString().slice(0, 10)` da mañana después de
-  las 21:00. Varias pantallas viejas todavía tienen ese `formatDate`.
+  las 21:00. Para ordenar por fecha, comparar los strings (`localeCompare`):
+  `YYYY-MM-DD` ordena bien como texto.
+  Se corrigió en todas las pantallas el 2026-09-30 (recibos, ticket,
+  derivaciones, créditos, solicitudes); no volver a escribir un `formatDate` local.
   Un string vacío en una fecha revienta el `TO_DATE` de ORDS con ORA-01841 → mandar `null`.
 - **Booleanos**: en la base son `'S'`/`'N'`, no `true`/`false`.
 
@@ -355,7 +360,8 @@ Detalle de las vías del ticket y del error de Windows con la térmica USB en
 2. ¿Se ve bien a 360 px de ancho, **con los textos más largos de los datos reales**?
    (ver §9: `truncate` sin `min-w-0` desborda)
 3. ¿Funciona en modo oscuro? (solo tokens, ningún color literal)
-4. ¿Los montos pasan por `formatCurrency` y las fechas por `formatDate`?
+4. ¿Los montos pasan por `formatCurrency` y las fechas por `fechaPy` (o `fechaLocal`)?
+   ¿"Hoy" sale de `hoyISO()`? Ningún `new Date("YYYY-MM-DD")` ni `toISOString()`.
 5. ¿Los errores llegan al usuario por `toast`, no por `console`?
 6. Si es ruta nueva de menú: ¿está en `app-header.tsx` **y** en `bottom-nav.tsx`?
 7. `npx tsc --noEmit` limpio.

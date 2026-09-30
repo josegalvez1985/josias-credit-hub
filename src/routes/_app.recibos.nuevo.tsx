@@ -15,6 +15,7 @@ import {
 import { ReciboAcciones, ticketDesdeRecibo } from "@/components/recibo-acciones";
 import { ClienteCombobox } from "@/components/cliente-combobox";
 import { formatCurrency } from "@/lib/credit-applications";
+import { fechaPy, hoyISO } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,8 +36,6 @@ export const Route = createFileRoute("/_app/recibos/nuevo")({
 
 type Opcion = { value: number; label: string };
 
-const hoy = () => new Date().toISOString().slice(0, 10);
-
 function NuevoRecibo() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -52,7 +51,7 @@ function NuevoRecibo() {
 
   const [monto, setMonto] = useState("");
   const [concepto, setConcepto] = useState("");
-  const [fecha, setFecha] = useState(hoy);
+  const [fecha, setFecha] = useState(hoyISO);
 
   // Al cambiar el cliente se cae todo lo de abajo; al cambiar la solicitud, la cuota.
   function elegirCliente(it: LovItem) {
@@ -118,7 +117,7 @@ function NuevoRecibo() {
     if (saldo > 0 && montoNum > saldo) {
       return toast.error(`El monto supera el saldo de la cuota (${formatCurrency(saldo)})`);
     }
-    if (fecha > hoy()) return toast.error("La fecha no puede ser posterior a hoy");
+    if (fecha > hoyISO()) return toast.error("La fecha no puede ser posterior a hoy");
 
     setLoading(true);
     try {
@@ -210,7 +209,7 @@ function NuevoRecibo() {
               setDatos(null);
               setMonto("");
               setConcepto("");
-              setFecha(hoy());
+              setFecha(hoyISO());
             }}
             className="flex-1 bg-primary text-primary-foreground hover:opacity-90"
           >
@@ -299,7 +298,7 @@ function NuevoRecibo() {
               <Dato label="Saldo de la cuota" value={formatCurrency(datos.saldo_cuota)} />
               <Dato
                 label="Vencimiento"
-                value={datos.fec_vencimiento ? formatFecha(datos.fec_vencimiento) : "—"}
+                value={fechaPy(datos.fec_vencimiento)}
               />
               {datos.total_interes > 0 && (
                 <Dato label="Intereses" value={formatCurrency(datos.total_interes)} />
@@ -330,7 +329,7 @@ function NuevoRecibo() {
                   dispositivo del cobrador y no la del servidor. */}
               <Field label="Fecha del recibo">
                 <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 text-sm font-medium">
-                  {formatFecha(fecha)}
+                  {fechaPy(fecha)}
                 </div>
               </Field>
             </div>
@@ -426,10 +425,4 @@ function Dato({ label, value }: { label: string; value: string }) {
       <span className="text-right text-sm font-medium">{value}</span>
     </div>
   );
-}
-
-function formatFecha(d: string) {
-  const date = new Date(d);
-  if (isNaN(date.getTime())) return d;
-  return date.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" });
 }

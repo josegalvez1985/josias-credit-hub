@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { AsyncCombobox } from "@/components/async-combobox";
-import { cn } from "@/lib/utils";
+import { cn, hoyISO } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/solicitudes/nueva")({
@@ -72,7 +72,7 @@ function NewApplication() {
   const [cliente, setCliente] = useState<{ value: number; label: string } | null>(null);
   const [ciudad, setCiudad] = useState<{ value: number; label: string } | null>(null);
   const [vendedor, setVendedor] = useState<{ value: number; label: string } | null>(null);
-  const [fechaFactura, setFechaFactura] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fechaFactura, setFechaFactura] = useState(hoyISO);
   const [cantidadCuotas, setCantidadCuotas] = useState("12");
   const [entregaInicial, setEntregaInicial] = useState("");
   const [fecVencInicial, setFecVencInicial] = useState("");

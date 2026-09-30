@@ -26,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { cn, fechaPy } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/admin/creditos/$id")({
   component: CreditoDetallePage,
@@ -141,13 +141,13 @@ function CreditoDetallePage() {
       <Card className="space-y-5 p-6">
         <Titulo icon={<CalendarClock className="h-5 w-5" />} texto="Datos del crédito" />
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Row label="Fecha de factura" value={formatDate(c.fecha_factura)} />
+          <Row label="Fecha de factura" value={fechaPy(c.fecha_factura)} />
           <Row label="Nro. de factura" value={c.referencia} />
           <Row label="Cantidad de cuotas" value={c.cantidad_cuotas} />
           <Row label="Monto de la cuota" value={money(c.monto_cuota)} />
           <Row label="Entrega inicial" value={money(c.entrega_inicial)} />
           <Row label="% Interés" value={c.porc_interes != null ? `${c.porc_interes}%` : undefined} />
-          <Row label="Vencimiento inicial" value={formatDate(c.fec_vencimiento_inicial)} />
+          <Row label="Vencimiento inicial" value={fechaPy(c.fec_vencimiento_inicial)} />
           <Row label="Ciudad" value={c.ciudad} />
           <Row label="Vendedor" value={c.vendedor} />
           {/* Viene de SOLICITUD_VENTAS_CABECERA por ID_SOLICITUD; los créditos
@@ -167,7 +167,7 @@ function CreditoDetallePage() {
           <Row label="Nro. de casa" value={c.nro_casa} />
           <Row label="Ciudad" value={c.ciudad_cliente} />
           <Row label="Estado civil" value={c.estado_civil} />
-          <Row label="Fecha de nacimiento" value={formatDate(c.fecha_nacimiento)} />
+          <Row label="Fecha de nacimiento" value={fechaPy(c.fecha_nacimiento)} />
         </div>
       </Card>
 
@@ -322,7 +322,7 @@ function CreditoDetallePage() {
                         <TableCell className="whitespace-nowrap font-medium">
                           {q.nro_cuota === 0 ? "Entrega inicial" : `Cuota ${q.nro_cuota}`}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">{formatDate(q.fec_vencimiento)}</TableCell>
+                        <TableCell className="whitespace-nowrap">{fechaPy(q.fec_vencimiento)}</TableCell>
                         <TableCell className="text-right">{money(q.monto_cuota)}</TableCell>
                         <TableCell className="text-right">{money(q.cobrado)}</TableCell>
                         <TableCell className="text-right font-medium">{money(q.saldo_cuota)}</TableCell>
@@ -392,11 +392,4 @@ function sino(v?: string) {
   if (v === "S") return "Sí";
   if (v === "N") return "No";
   return undefined;
-}
-
-function formatDate(d?: string) {
-  if (!d) return undefined;
-  const date = new Date(d);
-  if (isNaN(date.getTime())) return d;
-  return date.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" });
 }

@@ -24,7 +24,7 @@ import {
   soportaCopiarImagen,
   telefonoValido,
 } from "@/lib/recibo-whatsapp";
-import { cn } from "@/lib/utils";
+import { cn, fechaPy } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,12 +34,9 @@ import { toast } from "sonner";
 // Arma el ticket para imprimir o mandar por WhatsApp. Los importes van con
 // separador de miles y sin símbolo, como en el ticket de APEX ("Gs.: 350.000").
 export function ticketDesdeRecibo(d: ReciboDetalle): DatosTicket {
-  const fecha = new Date(d.fecha_recibo);
   return {
     nroRecibo: d.nro_recibo,
-    fecha: isNaN(fecha.getTime())
-      ? d.fecha_recibo
-      : fecha.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" }),
+    fecha: fechaPy(d.fecha_recibo),
     // El TOTAL es cuota + interés; `monto_letras` ya viene del total (obtenerRecibo).
     monto: totalRecibo(d).toLocaleString("es-PY"),
     importeCuota: d.monto.toLocaleString("es-PY"),

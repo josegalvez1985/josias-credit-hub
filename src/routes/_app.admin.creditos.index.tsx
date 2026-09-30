@@ -22,6 +22,7 @@ import { formatCurrency } from "@/lib/credit-applications";
 import { AdminHeader } from "./_app.admin";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
+import { fechaPy } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -258,7 +259,7 @@ function CreditosPage() {
                         </button>
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">{c.nro_solicitud}</TableCell>
-                      <TableCell className="whitespace-nowrap">{formatDate(c.fecha_factura)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{fechaPy(c.fecha_factura)}</TableCell>
                       <TableCell className="max-w-[10rem] truncate">{c.referencia || "—"}</TableCell>
                       {/* max-w + truncate: una <td> no se achica sola y el
                           nombre del cliente es el texto más largo de la fila. */}
@@ -299,11 +300,4 @@ function CreditosPage() {
       )}
     </div>
   );
-}
-
-function formatDate(d?: string) {
-  if (!d) return "—";
-  const date = new Date(d);
-  if (isNaN(date.getTime())) return d;
-  return date.toLocaleDateString("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" });
 }

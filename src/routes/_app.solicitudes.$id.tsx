@@ -15,6 +15,7 @@ import {
   type ActividadRow,
 } from "@/lib/api";
 import { formatCurrency } from "@/lib/credit-applications";
+import { fechaLocal } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 
 const ESTADO_CIVIL: Record<string, string> = {
@@ -286,7 +287,7 @@ function Row({ label, value }: { label: string; value?: string | number }) {
 
 function formatDate(d?: string) {
   if (!d) return "—";
-  const date = new Date(d);
-  if (isNaN(date.getTime())) return d;
+  const date = fechaLocal(d);
+  if (!date) return d;
   return date.toLocaleDateString("es-PY", { day: "2-digit", month: "short", year: "numeric" });
 }
