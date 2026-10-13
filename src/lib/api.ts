@@ -394,7 +394,7 @@ export type ReciboDetalle = Recibo & {
 };
 
 export type FiltroRecibos = {
-  q?: string;
+  buscar?: string;
   desde?: string; // YYYY-MM-DD
   hasta?: string; // YYYY-MM-DD
   anulados?: "S" | "N" | "T"; // T = todos
@@ -404,9 +404,11 @@ export type FiltroRecibos = {
 
 // A diferencia del resto de la app, recibos NO se trae entero: son 130.000+ filas.
 // El servidor pagina y busca; acá solo se arman los query params.
+// El parametro de busqueda es `buscar` y no `q`: `q` es reservado de ORDS y
+// nunca le llega al handler (la busqueda no filtraba nada hasta el 2026-10-13).
 export async function listarRecibos(f: FiltroRecibos = {}) {
   const qs = new URLSearchParams();
-  if (f.q?.trim()) qs.set("q", f.q.trim());
+  if (f.buscar?.trim()) qs.set("buscar", f.buscar.trim());
   if (f.desde) qs.set("desde", f.desde);
   if (f.hasta) qs.set("hasta", f.hasta);
   if (f.anulados) qs.set("anulados", f.anulados);

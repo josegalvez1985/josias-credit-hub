@@ -69,7 +69,7 @@ function RecibosPage() {
     }
     setLoading(true);
     setError(null);
-    listarRecibos({ q: busqueda, anulados, limit: PAGINA, offset: 0 })
+    listarRecibos({ buscar: busqueda, anulados, limit: PAGINA, offset: 0 })
       .then((r) => {
         setItems(r.items);
         setHasMore(r.hasMore);
@@ -82,7 +82,7 @@ function RecibosPage() {
 
   function cargarMas() {
     setLoadingMas(true);
-    listarRecibos({ q: busqueda, anulados, limit: PAGINA, offset: items.length })
+    listarRecibos({ buscar: busqueda, anulados, limit: PAGINA, offset: items.length })
       .then((r) => {
         setItems((prev) => [...prev, ...r.items]);
         setHasMore(r.hasMore);

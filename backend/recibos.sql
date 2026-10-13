@@ -271,8 +271,10 @@ CREATE OR REPLACE PACKAGE pkg_recibos AS
   FUNCTION es_admin(p_usuario VARCHAR2) RETURN VARCHAR2;
 
   -- Emite un recibo. Devuelve el NRO_RECIBO que asignó el trigger.
-  -- SALDO_CUOTA, TOTAL_INTERES y FEC_VENCIMIENTO se toman de V_SALDOS (foto del
-  -- momento del cobro), no de lo que mande el cliente.
+  -- SALDO_CUOTA y FEC_VENCIMIENTO se toman de V_SALDOS (foto del momento del
+  -- cobro), no de lo que mande el cliente. TOTAL_INTERES se calcula acá con la
+  -- misma fórmula de la vista, NO se lee de ella: ver "INTERÉS POR MORA" en el
+  -- cuerpo.
   FUNCTION crear(
     p_cod_cliente   NUMBER,
     p_id_solicitud  NUMBER,
@@ -374,8 +376,8 @@ CREATE OR REPLACE PACKAGE BODY pkg_recibos AS
     -- Foto de la cuota. Es lo que hacía la acción dinámica CALCULOS.
     ------------------------------------------------------------------
     BEGIN
-      SELECT NVL(saldo_cuota, 0), NVL(total_interes, 0), fec_vencimiento
-        INTO l_saldo_cuota, l_total_interes, l_fec_vencimiento
+      SELECT NVL(saldo_cuota, 0), fec_vencimiento
+        INTO l_saldo_cuota, l_fec_vencimiento
         FROM v_saldos
        WHERE cod_cliente  = p_cod_cliente
          AND id_solicitud = p_id_solicitud
@@ -384,6 +386,19 @@ CREATE OR REPLACE PACKAGE BODY pkg_recibos AS
       WHEN NO_DATA_FOUND THEN
         RAISE_APPLICATION_ERROR(-20204, 'La cuota no existe o no pertenece a ese cliente');
     END;
+
+    -- INTERÉS POR MORA. Misma fórmula que V_SALDOS.TOTAL_INTERES, pero sin
+    -- leerla de la vista: la vista cuenta los días con
+    --     TO_DATE(SYSDATE, 'DD/MM/YYYY') - fec_vencimiento
+    -- que pasa SYSDATE a texto con el NLS_DATE_FORMAT de la sesión. En APEX el
+    -- formato es de 4 dígitos y da bien; en la sesión de ORDS el año sale con
+    -- 2 ('13/10/26'), YYYY lo lee como el año 0026, la mora da ~ -730.000 días,
+    -- RETORNA_INTERES no encuentra tramo y devuelve 0. Así se emitieron sin
+    -- interés más de 350 recibos entre 2026-07 y 2026-10 (GUIA-BACKEND.md §7).
+    -- La mora se cuenta hasta HOY, igual que en APEX, no hasta la fecha del
+    -- recibo. Si cambia, cambiar también el GET cuota/:cod_cliente/...
+    l_total_interes := NVL(RETORNA_INTERES(TRUNC(SYSDATE) - l_fec_vencimiento), 0) / 100
+                       * l_saldo_cuota;
 
     IF l_saldo_cuota <= 0 THEN
       RAISE_APPLICATION_ERROR(-20205, 'La cuota ya está cancelada');
@@ -658,12 +673,17 @@ BEGIN
 
 
   -- ==================================================================
-  -- LISTADO   GET /recibos/?limit=&offset=&q=&desde=&hasta=&anulados=
+  -- LISTADO   GET /recibos/?limit=&offset=&buscar=&desde=&hasta=&anulados=
   -- ==================================================================
   -- A diferencia del resto de la app, acá NO se trae todo y se filtra en el
   -- cliente: la tabla tiene más de 130.000 recibos. Se pagina y se busca en
   -- el servidor. La respuesta imita el feed de ORDS ({items, hasMore}) para
   -- que el cliente HTTP no tenga que aprender otro formato.
+  --
+  -- La búsqueda se llama `buscar` y NO `q`: `q` es reservado de ORDS, el bind
+  -- nunca recibía el valor y el filtro no hacía nada (2026-10-13). En los
+  -- números (recibo, solicitud, CI) se ignoran los puntos: "100.234" encuentra
+  -- el recibo 100234.
   ORDS.DEFINE_TEMPLATE(
       p_module_name    => 'recibos',
       p_pattern        => '.',
@@ -686,7 +706,8 @@ BEGIN
         l_admin    VARCHAR2(1);
         l_limit    NUMBER       := LEAST(NVL(:limit, 50), 500);
         l_offset   NUMBER       := NVL(:offset, 0);
-        l_q        VARCHAR2(200):= UPPER(TRIM(:q));
+        l_q        VARCHAR2(200):= UPPER(TRIM(:buscar));
+        l_num      VARCHAR2(200):= REPLACE(l_q, ''.'', '''');
         l_desde    DATE;
         l_hasta    DATE;
         l_anulados VARCHAR2(1)  := NVL(UPPER(:anulados), ''N'');
@@ -737,9 +758,9 @@ BEGIN
              AND (l_hasta IS NULL OR cc.fecha_recibo <  l_hasta + 1)
              AND (l_q IS NULL
                   OR UPPER(c.razon_social) LIKE ''%'' || l_q || ''%''
-                  OR TO_CHAR(cc.nro_recibo)    LIKE ''%'' || l_q || ''%''
-                  OR TO_CHAR(v.nro_solicitud)  LIKE ''%'' || l_q || ''%''
-                  OR REPLACE(NVL(c.ci, c.ruc), ''.'', '''') LIKE ''%'' || REPLACE(l_q, ''.'', '''') || ''%'')
+                  OR TO_CHAR(cc.nro_recibo)    LIKE ''%'' || l_num || ''%''
+                  OR TO_CHAR(v.nro_solicitud)  LIKE ''%'' || l_num || ''%''
+                  OR REPLACE(NVL(c.ci, c.ruc), ''.'', '''') LIKE ''%'' || l_num || ''%'')
            ORDER BY cc.fecha_recibo DESC, cc.nro_recibo DESC
            OFFSET l_offset ROWS FETCH NEXT l_limit + 1 ROWS ONLY
         ) LOOP
@@ -1327,6 +1348,12 @@ BEGIN
   -- ==================================================================
   -- Equivale a la acción dinámica CALCULOS de la página 3: al elegir la cuota
   -- devuelve saldo, interés, vencimiento y el concepto sugerido.
+  --
+  -- El interés NO sale de V_SALDOS.TOTAL_INTERES: en la sesión de ORDS esa
+  -- columna da 0 (ver "INTERÉS POR MORA" en pkg_recibos.crear). Se recalcula
+  -- con la misma fórmula, restando fechas sin pasar por texto. Tiene que dar
+  -- lo mismo que guarda crear, porque es lo que la pantalla le muestra al
+  -- cobrador antes de emitir.
   ORDS.DEFINE_TEMPLATE(
       p_module_name    => 'recibos',
       p_pattern        => 'cuota/:cod_cliente/:id_solicitud/:id_cuota',
@@ -1344,7 +1371,8 @@ BEGIN
       p_comments       => NULL,
       p_source         =>
 '      SELECT NVL(s.saldo_cuota, 0)                     AS saldo_cuota,
-             NVL(s.total_interes, 0)                    AS total_interes,
+             NVL(RETORNA_INTERES(TRUNC(SYSDATE) - s.fec_vencimiento), 0) / 100
+               * NVL(s.saldo_cuota, 0)                  AS total_interes,
              TO_CHAR(s.fec_vencimiento, ''YYYY-MM-DD'') AS fec_vencimiento,
              RETORNA_ARTICULOS(:id_solicitud)           AS concepto,
              FN_CUOTAS(:id_solicitud, :id_cuota)        AS cuota_texto
@@ -1425,6 +1453,24 @@ END;
 --
 --    SELECT line, position, text
 --      FROM user_errors WHERE name = 'PKG_RECIBOS' ORDER BY sequence;
+--
+-- c2) Recibos emitidos SIN interés que debían tenerlo (bug de V_SALDOS en la
+--     sesión de ORDS, ver "INTERÉS POR MORA" en pkg_recibos.crear). Cuenta la
+--     mora hasta la fecha del recibo, que es lo más cercano a la foto que debió
+--     tomarse. Con el paquete corregido, de ahí en adelante no tiene que
+--     aparecer ninguno.
+--
+--    SELECT nro_recibo, fecha_recibo, cod_cliente, cod_usuario, fec_vencimiento,
+--           TRUNC(fecha_recibo) - fec_vencimiento AS dias_mora,
+--           saldo_cuota,
+--           RETORNA_INTERES(TRUNC(fecha_recibo) - fec_vencimiento) / 100
+--             * saldo_cuota AS interes_no_cobrado
+--      FROM cuotas_cobradas
+--     WHERE NVL(anulado,'N') = 'N'
+--       AND NVL(total_interes,0) = 0
+--       AND fecha_recibo >= DATE '2026-07-01'
+--       AND RETORNA_INTERES(TRUNC(fecha_recibo) - fec_vencimiento) > 0
+--     ORDER BY fecha_recibo, nro_recibo;
 --
 -- d) Prueba de humo del endpoint (reemplazar <TOKEN> y el host):
 --

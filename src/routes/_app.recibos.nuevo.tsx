@@ -100,7 +100,7 @@ function NuevoRecibo() {
 
   const montoNum = Number(monto.replace(/\D/g, "")) || 0;
   const saldo = datos?.saldo_cuota ?? 0;
-  // El backend guarda el interés de V_SALDOS al emitir, no lo que se tipea:
+  // El backend calcula y guarda el interés al emitir, no lo que se tipea:
   // acá solo se muestra para que el cobrador vea el total (ver totalRecibo).
   const interes = datos?.total_interes ?? 0;
 

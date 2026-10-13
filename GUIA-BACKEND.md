@@ -269,10 +269,35 @@ Por eso el `INSERT` va con `NRO_RECIBO` en NULL y se recupera con `RETURNING`.
 
 **`MONTO` no incluye el interés.** Es solo lo que se descuenta de la cuota (por
 eso no puede superar el saldo). El interés por mora se guarda aparte en
-`TOTAL_INTERES`, que es una foto de `V_SALDOS` al momento del cobro. Lo que pagó
+`TOTAL_INTERES`, calculado al momento del cobro (ver abajo). Lo que pagó
 el cliente es `MONTO + TOTAL_INTERES`: todas las vistas e impresos muestran ese
 total con `totalRecibo()` de `api.ts`, y el "Son:" en letras se pide con ese
 total a `/recibos/letras` (el handler del detalle arma `NUM_LETRAS(cc.monto)`,
 sin el interés).
+
+### El interés por mora no se lee de `V_SALDOS` (2026-10-13)
+
+La fórmula es `RETORNA_INTERES(días de mora) / 100 × saldo de la cuota`.
+`RETORNA_INTERES` busca el tramo en la tabla `INTERESES`:
+
+| Días de mora | 0–5 | 6–30 | 31–60 | 61–90 | … | 271–300 | > 300 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Interés | 0 % (gracia) | 3 % | 6 % | 9 % | +3 % cada 30 días | 30 % | **0 %** (sin tramo) |
+
+Si no encuentra tramo, o si algo falla, **devuelve 0 sin avisar** (`when others
+then return 0`).
+
+`V_SALDOS` calcula los días con `TO_DATE(SYSDATE, 'DD/MM/YYYY') - fec_vencimiento`.
+Eso convierte `SYSDATE` a texto con el `NLS_DATE_FORMAT` de la sesión: en APEX
+el año tiene 4 dígitos y da bien. En ORDS sale con 2 (`13/10/26`), `YYYY` lo lee
+como el año 0026, la mora da unos −730.000 días y el interés da **0**. Así se
+emitieron sin interés 353 recibos entre julio y octubre de 2026 (junio, todo APEX:
+0 de 311).
+
+Por eso `pkg_recibos.crear` y `GET /recibos/cuota/...` recalculan con
+`TRUNC(SYSDATE) - fec_vencimiento`: misma fórmula, sin pasar por texto. La mora
+se cuenta **hasta hoy**, como en APEX. **No volver a leer `DIAS_MORA`,
+`INTERES`, `TOTAL_INTERES` ni `TOTAL_CUOTA` de `V_SALDOS`** desde ORDS; el
+resto de las columnas está bien. La vista no se tocó porque la usa APEX.
 
 Se irá actualizando esta tabla a medida que avance la migración.
