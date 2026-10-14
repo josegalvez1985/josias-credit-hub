@@ -960,6 +960,24 @@ export function listarFacturasCompra(f: { codProveedor?: number; pendientes?: bo
   );
 }
 
+// Un renglón de COMPRAS_DETALLE. No hay IVA ni descuento aparte: `subtotal` es
+// cantidad * precio_unitario, y Math.round de la suma de los subtotales da el
+// `total` de la factura (el ROUND va solo en el total, como en Oracle).
+export type ArticuloFacturaCompra = {
+  id_detalle: number;
+  cod_articulo?: number;
+  articulo?: string;
+  cantidad?: number;
+  precio_unitario?: number;
+  subtotal: number;
+};
+
+export function listarArticulosFactura(idCabecera: number) {
+  return request<{ items: ArticuloFacturaCompra[] }>(
+    `/proveedores/facturas/${idCabecera}/articulos`,
+  ).then((r) => r.items ?? []);
+}
+
 export function listarRecibosProveedor(f: { codProveedor?: number } = {}) {
   const qs = f.codProveedor ? `?cod_proveedor=${f.codProveedor}` : "";
   return request<{ items: ReciboProveedor[] }>(`/proveedores/recibos${qs}`).then(

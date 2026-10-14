@@ -1,12 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { AlertCircle, ArrowLeft, FileText, Loader2, Receipt, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, FileText, Loader2, Package, Receipt, Trash2 } from "lucide-react";
 import {
   COMPROBANTE_DE,
   eliminarReciboProveedor,
   FORMAS_PAGO,
   obtenerReciboProveedor,
   type ReciboProveedorDetalle,
+  type ReciboProveedorFactura,
 } from "@/lib/api";
 import { formatCurrency } from "@/lib/credit-applications";
 import { fechaPy } from "@/lib/utils";
@@ -22,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ArticulosFacturaDialog } from "@/components/articulos-factura-dialog";
 import {
   Table,
   TableBody,
@@ -44,6 +46,7 @@ function ReciboProveedorPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmar, setConfirmar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
+  const [verFactura, setVerFactura] = useState<ReciboProveedorFactura | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -166,6 +169,7 @@ function ReciboProveedorPage() {
                 <TableHead className="text-right">Aplicado</TableHead>
                 {/* El saldo de hoy: incluye lo que pagaron otros recibos después. */}
                 <TableHead className="text-right">Saldo actual</TableHead>
+                <TableHead className="w-0" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -181,6 +185,16 @@ function ReciboProveedorPage() {
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
                     {f.saldo <= 0 ? "Pagada" : formatCurrency(f.saldo)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setVerFactura(f)}
+                      className="gap-1.5 whitespace-nowrap text-secondary hover:bg-secondary/15 hover:text-secondary"
+                    >
+                      <Package className="h-4 w-4" /> Ver artículos
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -211,6 +225,8 @@ function ReciboProveedorPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ArticulosFacturaDialog factura={verFactura} onClose={() => setVerFactura(null)} />
     </div>
   );
 }

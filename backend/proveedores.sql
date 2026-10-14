@@ -671,6 +671,90 @@ BEGIN
 
 
   -- ==================================================================
+  -- ARTÍCULOS DE UNA FACTURA   GET /proveedores/facturas/:id/articulos
+  -- ==================================================================
+  -- Los renglones de COMPRAS_DETALLE de una factura (:id = ID_CABECERA), con
+  -- la descripción del artículo. Lo usa el modal "Ver artículos" del detalle
+  -- de un recibo (2026-10-14).
+  --
+  -- COMPRAS_DETALLE no tiene IVA ni descuento aparte: el subtotal es
+  -- cantidad × precio_unitario, y la suma redondeada de los subtotales es el
+  -- TOTAL DE FACTURA (ver cabecera del archivo). El ROUND va solo en el total,
+  -- igual que en los otros handlers; el subtotal viaja con sus decimales.
+  --
+  -- 404 si la factura no existe. Una factura que existe pero no tiene
+  -- renglones devuelve items vacío: es la "Sin monto" de las pantallas.
+  ORDS.DEFINE_TEMPLATE(
+      p_module_name    => 'proveedores',
+      p_pattern        => 'facturas/:id/articulos',
+      p_priority       => 0,
+      p_etag_type      => 'NONE',
+      p_etag_query     => NULL,
+      p_comments       => NULL);
+
+  ORDS.DEFINE_HANDLER(
+      p_module_name    => 'proveedores',
+      p_pattern        => 'facturas/:id/articulos',
+      p_method         => 'GET',
+      p_source_type    => 'plsql/block',
+      p_mimes_allowed  => NULL,
+      p_comments       => NULL,
+      p_source         =>
+'
+      DECLARE
+        l_user   VARCHAR2(255);
+        l_id     NUMBER;
+        l_existe NUMBER;
+      BEGIN' || l_guardia || '
+        BEGIN l_id := TO_NUMBER(:id); EXCEPTION WHEN OTHERS THEN l_id := NULL; END;
+
+        SELECT COUNT(*) INTO l_existe FROM compras_cabecera WHERE id_cabecera = l_id;
+        IF l_existe = 0 THEN
+          :status_code := 404;
+          htp.p(''{"success": false, "message": "La factura no existe"}'');
+          RETURN;
+        END IF;
+
+        apex_json.open_object;
+        apex_json.write(''success'', TRUE);
+        apex_json.open_array(''items'');
+
+        FOR r IN (
+          SELECT d.id_detalle,
+                 d.cod_articulo,
+                 a.descripcion                                    AS articulo,
+                 d.cantidad,
+                 d.precio_unitario,
+                 NVL(d.cantidad, 0) * NVL(d.precio_unitario, 0)   AS subtotal
+            FROM compras_detalle d
+            LEFT JOIN articulos a ON a.cod_articulo = d.cod_articulo
+           WHERE d.id_cabecera = l_id
+           ORDER BY d.id_detalle
+        ) LOOP
+          apex_json.open_object;
+          apex_json.write(''id_detalle'',      r.id_detalle);
+          apex_json.write(''cod_articulo'',    r.cod_articulo);
+          apex_json.write(''articulo'',        r.articulo);
+          apex_json.write(''cantidad'',        r.cantidad);
+          apex_json.write(''precio_unitario'', r.precio_unitario);
+          apex_json.write(''subtotal'',        r.subtotal);
+          apex_json.close_object;
+        END LOOP;
+
+        apex_json.close_array;
+        apex_json.close_object;
+      EXCEPTION WHEN OTHERS THEN
+        :status_code := 500;
+        htp.p(''{"success": false, "message": '' || apex_json.stringify(SQLERRM) || ''}'');
+      END;
+    ');
+
+  ORDS.DEFINE_PARAMETER(p_module_name => 'proveedores', p_pattern => 'facturas/:id/articulos', p_method => 'GET',
+      p_name => 'authorization', p_bind_variable_name => 'authorization',
+      p_source_type => 'HEADER', p_param_type => 'STRING', p_access_method => 'IN', p_comments => NULL);
+
+
+  -- ==================================================================
   -- LISTADO DE RECIBOS   GET /proveedores/recibos?cod_proveedor=
   -- ==================================================================
   -- `facturas` es el texto con los números de factura que paga cada recibo,
@@ -1098,7 +1182,7 @@ END;
 -- 4. VERIFICACIÓN (correr a mano, no es parte del despliegue)
 -- =====================================================================
 
--- 4.a  ¿Quedaron los siete handlers?
+-- 4.a  ¿Quedaron los ocho handlers?
 --
 --   SELECT t.uri_template, h.method, h.source_type
 --     FROM user_ords_modules p
@@ -1107,15 +1191,17 @@ END;
 --    WHERE p.name = 'proveedores'
 --    ORDER BY t.uri_template, h.method;
 --
--- Tienen que ser exactamente estas siete filas (`pagos` se agregó el
--- 2026-09-24 para el reporte; si falta, el módulo es el de antes):
---   facturas          GET     plsql/block
---   lov/proveedores   GET     plsql/block
---   pagos             GET     plsql/block
---   recibos           GET     plsql/block
---   recibos           POST    plsql/block
---   recibos/:id       DELETE  plsql/block
---   recibos/:id       GET     plsql/block
+-- Tienen que ser exactamente estas ocho filas (`pagos` se agregó el
+-- 2026-09-24 para el reporte y `facturas/:id/articulos` el 2026-10-14 para el
+-- modal del detalle; si falta alguna, el módulo es el de antes):
+--   facturas                GET     plsql/block
+--   facturas/:id/articulos  GET     plsql/block
+--   lov/proveedores         GET     plsql/block
+--   pagos                   GET     plsql/block
+--   recibos                 GET     plsql/block
+--   recibos                 POST    plsql/block
+--   recibos/:id             DELETE  plsql/block
+--   recibos/:id             GET     plsql/block
 
 -- 4.b  ¿El total calculado coincide con la factura en papel? Tomar dos o tres
 --      facturas y compararlas a mano:
@@ -1139,6 +1225,9 @@ END;
 --   curl -i "$B/facturas?cod_proveedor=<COD>"           -H "Authorization: Bearer $TOKEN"
 --   curl -i "$B/recibos"                                -H "Authorization: Bearer $TOKEN"
 --   curl -i "$B/pagos"                                  -H "Authorization: Bearer $TOKEN"
+--   curl -i "$B/facturas/<ID>/articulos"                -H "Authorization: Bearer $TOKEN"
+--     -> la suma redondeada de los `subtotal` tiene que dar el `total` de
+--        esa factura en `facturas`. Un ID que no existe -> 404.
 --
 --   Sin el header -> 401. Con token de un usuario que no está en la lista ->
 --   400 "no tiene habilitado el modulo administrativo".

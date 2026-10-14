@@ -21,6 +21,7 @@ import {
 import { formatCurrency } from "@/lib/credit-applications";
 import { cn, fechaPy } from "@/lib/utils";
 import { AdminHeader } from "./_app.admin";
+import { ArticulosFacturaDialog } from "@/components/articulos-factura-dialog";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -162,6 +163,7 @@ function RecibosProveedoresPage() {
 function TablaFacturas({ facturas }: { facturas: FacturaCompra[] }) {
   const [soloPendientes, setSoloPendientes] = useState(true);
   const [query, setQuery] = useState("");
+  const [verFactura, setVerFactura] = useState<FacturaCompra | null>(null);
 
   const visibles = useMemo(
     () =>
@@ -224,6 +226,7 @@ function TablaFacturas({ facturas }: { facturas: FacturaCompra[] }) {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/60 hover:bg-muted/60">
+                  <TableHead className="w-14">Ver</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Nro. Factura</TableHead>
                   <TableHead>Proveedor</TableHead>
@@ -237,6 +240,17 @@ function TablaFacturas({ facturas }: { facturas: FacturaCompra[] }) {
               <TableBody>
                 {visibles.map((f) => (
                   <TableRow key={f.id_cabecera}>
+                    <TableCell>
+                      <button
+                        type="button"
+                        onClick={() => setVerFactura(f)}
+                        aria-label={`Ver artículos de la factura ${f.referencia || f.id_cabecera}`}
+                        title="Ver artículos"
+                        className="inline-flex rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary/15 hover:text-secondary"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </TableCell>
                     <TableCell className="whitespace-nowrap">{fechaPy(f.fecha)}</TableCell>
                     <TableCell className="whitespace-nowrap font-mono text-xs">
                       {f.referencia || (
@@ -287,6 +301,8 @@ function TablaFacturas({ facturas }: { facturas: FacturaCompra[] }) {
           </div>
         </Card>
       )}
+
+      <ArticulosFacturaDialog factura={verFactura} onClose={() => setVerFactura(null)} />
     </div>
   );
 }

@@ -167,11 +167,12 @@ la cabecera de [backend/proveedores.sql](backend/proveedores.sql).
 | Pieza | Estado |
 | --- | --- |
 | `backend/proveedores.sql` | ✅ desplegado — `pkg_recibos_compra` + módulo ORDS `proveedores`. ⏳ **Falta redesplegar** dos cambios del 2026-09-24: el paquete (formas de pago nuevas, sección 2) y el módulo (handler `GET pagos` para el reporte, 3.a + 3.b). Antes, correr a mano la 1.a |
-| Cliente HTTP | ✅ hecho — `listarFacturasCompra`, `listarRecibosProveedor`, `obtenerReciboProveedor`, `crearReciboProveedor`, `eliminarReciboProveedor`, `lovProveedores`, `listarPagosFacturas` |
+| Cliente HTTP | ✅ hecho — `listarFacturasCompra`, `listarRecibosProveedor`, `obtenerReciboProveedor`, `crearReciboProveedor`, `eliminarReciboProveedor`, `lovProveedores`, `listarPagosFacturas`, `listarArticulosFactura` |
 | Reporte | ✅ hecho — Saldos de Proveedores (Administración → Reportes), ver `GUIA-FRONTEND.md` §10 |
 | Listado | ✅ hecho — [\_app.admin.recibos-proveedores.index.tsx](src/routes/_app.admin.recibos-proveedores.index.tsx), pestañas facturas / recibos |
 | Alta | ✅ hecha — [\_app.admin.recibos-proveedores.nuevo.tsx](src/routes/_app.admin.recibos-proveedores.nuevo.tsx) |
 | Detalle y baja | ✅ hecho — [\_app.admin.recibos-proveedores.$id.tsx](src/routes/_app.admin.recibos-proveedores.$id.tsx) |
+| Artículos de una factura | ✅ hecho (2026-10-14) — modal [articulos-factura-dialog.tsx](src/components/articulos-factura-dialog.tsx), se abre desde el ojo de la pestaña Facturas y desde "Ver artículos" en el detalle del recibo + `GET /proveedores/facturas/:id/articulos`. ⏳ **Falta desplegar** el módulo (3.a + 3.b; el paquete no cambió) |
 
 Lo que no es obvio:
 
