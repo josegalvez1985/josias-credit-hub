@@ -271,7 +271,16 @@ Por eso el `INSERT` va con `NRO_RECIBO` en NULL y se recupera con `RETURNING`.
 **`MONTO` no incluye el interés.** Es solo lo que se descuenta de la cuota (por
 eso no puede superar el saldo). El interés por mora se guarda aparte en
 `TOTAL_INTERES`, calculado al momento del cobro (ver abajo). Lo que pagó
-el cliente es `MONTO + TOTAL_INTERES`: todas las vistas e impresos muestran ese
+el cliente es `MONTO + TOTAL_INTERES`.
+
+**En la pantalla, el cobrador escribe el total** (2026-10-14), con tope en saldo +
+interés, y se reparte **interés primero**: el interés se cobra completo y solo el
+resto baja la cuota. Si no alcanza para el interés, no se emite. La pantalla
+manda como `monto` solo la parte de la cuota (`aCuota` en `_app.recibos.nuevo.tsx`),
+así que el backend no cambió: `pkg_recibos.crear` sigue validando
+`MONTO <= saldo` y recalculando el interés.
+
+Todas las vistas e impresos muestran el
 total con `totalRecibo()` de `api.ts`, y el "Son:" en letras se pide con ese
 total a `/recibos/letras` (el handler del detalle arma `NUM_LETRAS(cc.monto)`,
 sin el interés).

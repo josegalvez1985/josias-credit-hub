@@ -15,7 +15,7 @@ import {
 import { ReciboAcciones, ticketDesdeRecibo } from "@/components/recibo-acciones";
 import { ClienteCombobox } from "@/components/cliente-combobox";
 import { formatCurrency } from "@/lib/credit-applications";
-import { fechaPy, hoyISO } from "@/lib/utils";
+import { cn, fechaPy, hoyISO } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -88,7 +88,8 @@ function NuevoRecibo() {
     datosCuota(cliente.value, solicitud.value, cuota.value)
       .then((d) => {
         setDatos(d);
-        setMonto(String(d.saldo_cuota ?? 0));
+        // Se propone cobrar todo: saldo + intereses (ver "interés primero").
+        setMonto(String((d.saldo_cuota ?? 0) + Math.round(d.total_interes ?? 0)));
         if (d.concepto) setConcepto(d.concepto);
       })
       .catch((e) => {
@@ -98,11 +99,21 @@ function NuevoRecibo() {
       .finally(() => setCargandoCuota(false));
   }, [cliente, solicitud, cuota]);
 
+  // El cobrador escribe el TOTAL que cobra (cuota + intereses), con tope en
+  // saldo + intereses. Se reparte "interés primero" (regla de Jose,
+  // 2026-10-14): el interés se cobra completo y solo el resto baja la cuota.
+  //
+  // A Oracle viaja como `monto` solo la parte de la cuota (`aCuota`), que es lo
+  // que siempre guardó CUOTAS_COBRADAS.MONTO; el interés lo vuelve a calcular
+  // pkg_recibos.crear al emitir y lo guarda en TOTAL_INTERES. Así el backend no
+  // cambia y MONTO + TOTAL_INTERES (totalRecibo) da lo que se escribió acá.
+  // Se redondea porque el porcentaje sobre el saldo puede dar decimales y el
+  // guaraní no los tiene.
   const montoNum = Number(monto.replace(/\D/g, "")) || 0;
   const saldo = datos?.saldo_cuota ?? 0;
-  // El backend calcula y guarda el interés al emitir, no lo que se tipea:
-  // acá solo se muestra para que el cobrador vea el total (ver totalRecibo).
-  const interes = datos?.total_interes ?? 0;
+  const interes = Math.round(datos?.total_interes ?? 0);
+  const tope = saldo + interes;
+  const aCuota = montoNum - interes;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -114,8 +125,17 @@ function NuevoRecibo() {
     if (faltantes.length) return toast.error(`Completá: ${faltantes.join(", ")}`);
 
     if (montoNum <= 0) return toast.error("El monto debe ser mayor a cero");
-    if (saldo > 0 && montoNum > saldo) {
-      return toast.error(`El monto supera el saldo de la cuota (${formatCurrency(saldo)})`);
+    if (montoNum > tope) {
+      return toast.error(
+        interes > 0
+          ? `El monto supera el saldo de la cuota más los intereses (${formatCurrency(tope)})`
+          : `El monto supera el saldo de la cuota (${formatCurrency(saldo)})`,
+      );
+    }
+    // Interés primero: si no alcanza para el interés, no queda nada para la
+    // cuota y Oracle rechaza un MONTO en cero.
+    if (aCuota <= 0) {
+      return toast.error(`El monto no cubre los intereses (${formatCurrency(interes)})`);
     }
     if (fecha > hoyISO()) return toast.error("La fecha no puede ser posterior a hoy");
 
@@ -125,7 +145,7 @@ function NuevoRecibo() {
         cod_cliente: cliente!.value,
         id_solicitud: solicitud!.value,
         id_cuota: cuota!.value,
-        monto: montoNum,
+        monto: aCuota, // solo la parte de la cuota; el interés lo pone Oracle
         fecha_recibo: fecha,
         concepto: concepto.trim() || undefined,
       });
@@ -307,18 +327,30 @@ function NuevoRecibo() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={interes > 0 ? "Pago a la cuota" : "Monto a cobrar"} required>
+              <Field label="Monto a cobrar" required>
                 <Input
                   inputMode="numeric"
                   value={montoNum ? montoNum.toLocaleString("es-PY") : ""}
                   onChange={(e) => setMonto(e.target.value.replace(/\D/g, ""))}
-                  className="font-display text-lg font-semibold"
+                  aria-invalid={montoNum > tope || (montoNum > 0 && aCuota <= 0)}
+                  className={cn(
+                    "font-display text-lg font-semibold",
+                    (montoNum > tope || (montoNum > 0 && aCuota <= 0)) && "border-destructive",
+                  )}
                 />
-                {montoNum > 0 && saldo > 0 && montoNum < saldo && (
-                  <p className="mt-1.5 text-xs text-warning-foreground">
-                    Pago parcial. Queda un saldo de {formatCurrency(saldo - montoNum)}.
+                {montoNum > tope ? (
+                  <p className="mt-1.5 text-xs text-destructive">
+                    Supera el máximo de {formatCurrency(tope)}.
                   </p>
-                )}
+                ) : montoNum > 0 && aCuota <= 0 ? (
+                  <p className="mt-1.5 text-xs text-destructive">
+                    No cubre los intereses ({formatCurrency(interes)}).
+                  </p>
+                ) : montoNum > 0 && aCuota < saldo ? (
+                  <p className="mt-1.5 text-xs text-warning-foreground">
+                    Pago parcial. Queda un saldo de {formatCurrency(saldo - aCuota)}.
+                  </p>
+                ) : null}
               </Field>
 
               {/* La fecha del recibo NO se edita: siempre es la del día del
@@ -334,19 +366,18 @@ function NuevoRecibo() {
               </Field>
             </div>
 
-            {/* El interés se cobra aparte del monto (que es solo lo que se
-                descuenta de la cuota), así que el cobrador tiene que ver el
-                total que le pide al cliente antes de emitir. */}
-            {interes > 0 && montoNum > 0 && (
+            {/* Cómo se reparte lo que se escribió: primero el interés, el
+                resto a la cuota. Es lo que va a decir el recibo impreso. */}
+            {interes > 0 && aCuota > 0 && montoNum <= tope && (
               <div className="flex items-baseline justify-between gap-3 rounded-xl border border-primary bg-primary/10 px-4 py-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium">Total a cobrar</p>
                   <p className="text-xs text-muted-foreground">
-                    Cuota {formatCurrency(montoNum)} + intereses {formatCurrency(interes)}
+                    Intereses {formatCurrency(interes)} + cuota {formatCurrency(aCuota)}
                   </p>
                 </div>
                 <p className="shrink-0 font-display text-2xl font-semibold tracking-tight">
-                  {formatCurrency(montoNum + interes)}
+                  {formatCurrency(montoNum)}
                 </p>
               </div>
             )}
