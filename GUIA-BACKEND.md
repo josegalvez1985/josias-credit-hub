@@ -198,6 +198,30 @@ Lo que no es obvio:
   `COMPRAS_DETALLE`. Las pantallas la muestran como "Sin monto"
   (`estadoFactura` en `api.ts`), no como "Pagada".
 
+### Definiciones — Profesiones (2026-10-19)
+
+ABM de `PROFESIONES` en el grupo **Definiciones** del menú. Es el primer
+ocupante de [backend/definiciones.sql](backend/definiciones.sql): las próximas
+tablas maestras van como template nuevo del mismo módulo y procedimientos del
+mismo `pkg_definiciones`.
+
+| Pieza | Estado |
+| --- | --- |
+| `backend/definiciones.sql` | ⏳ **Falta desplegar**: paquete → 3.a → 3.b, en tres ejecuciones |
+| Cliente HTTP | ✅ hecho — `listarProfesiones`, `crearProfesion`, `actualizarProfesion`, `eliminarProfesion` |
+| Pantalla | ✅ hecha — [\_app.admin.definiciones.profesiones.tsx](src/routes/_app.admin.definiciones.profesiones.tsx), tabla + diálogo de alta/edición |
+
+Lo que no es obvio:
+
+- **`SOLICITUD_VENTAS_ACTIVIDAD_LABORAL.COD_PROFESION` no tiene FK.** Solo
+  `VENTAS_ACTIVIDAD_LABORAL` la tiene. El paquete cuenta las dos antes de
+  borrar; sin eso, Oracle dejaría borrar una profesión usada en solicitudes.
+- La descripción se guarda **como se escribe** (sin forzar mayúsculas), sin
+  espacios de más, y no se puede repetir sin distinguir mayúsculas.
+- Editar renombra la profesión en todas las solicitudes y créditos que la
+  usan, y el LOV del asesor (`/solicitudes/lov/profesiones`) la ve al instante.
+- El código lo pone el trigger `BI_PROFESIONES` (`PROFESIONES_SEQ`).
+
 ### Tres cosas que no hay que perder de vista
 
 **`VENTAS_*` no es `SOLICITUD_VENTAS_*`.** Son tablas distintas: las

@@ -1,5 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  BookMarked,
+  Briefcase,
   ChartColumn,
   FileChartColumn,
   FileSpreadsheet,
@@ -36,6 +38,21 @@ export type GrupoAdmin = {
 };
 
 export const GRUPOS_ADMIN: GrupoAdmin[] = [
+  {
+    // Tablas maestras (backend/definiciones.sql). Las próximas (ciudades,
+    // vendedores...) se suman como secciones de este grupo.
+    id: "definiciones",
+    label: "Definiciones",
+    icon: BookMarked,
+    secciones: [
+      {
+        to: "/admin/definiciones/profesiones",
+        label: "Profesiones",
+        descripcion: "Profesiones de la actividad laboral del cliente",
+        icon: Briefcase,
+      },
+    ],
+  },
   {
     id: "operaciones",
     label: "Operaciones",

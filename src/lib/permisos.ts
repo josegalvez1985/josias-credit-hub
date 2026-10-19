@@ -24,8 +24,9 @@ import { useAuth } from "./auth";
 // contra el token — la lista de acá solo decide qué se dibuja.
 //
 // ⚠ La misma lista está en backend/proveedores.sql (pkg_recibos_compra.es_admin
-// y l_admins del módulo). Un usuario agregado solo acá ve el menú pero Oracle
-// le rechaza cada pedido de Recibos de Proveedores.
+// y l_admins del módulo) y en backend/definiciones.sql (pkg_definiciones.es_admin
+// y l_admins). Un usuario agregado solo acá ve el menú pero Oracle le rechaza
+// cada pedido de Recibos de Proveedores y de Definiciones.
 const USUARIOS_ADMIN = ["AAQUINO", "AGONZALEZ", "JOSEG"] as const;
 
 export function esUsuarioAdmin(username?: string | null): boolean {

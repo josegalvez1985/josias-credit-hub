@@ -170,6 +170,7 @@ solo por unas pocas personas, y ahí las reglas cambian a propósito.
   | Alta con escritura: cabecera + tabla de filas elegibles con monto | `_app.admin.recibos-proveedores.nuevo.tsx` |
   | Detalle con borrado detrás de un `AlertDialog` | `_app.admin.recibos-proveedores.$id.tsx` |
   | Reporte: opciones + vista previa + PDF | `_app.admin.reportes.saldos-proveedores.tsx` |
+  | ABM de tabla maestra: tabla + `Dialog` de alta/edición + `AlertDialog` de baja | `_app.admin.definiciones.profesiones.tsx` |
 
 Quién lo ve lo decide [src/lib/permisos.ts](src/lib/permisos.ts): lista blanca de
 usuarios **y** pantalla ≥ 1024 px. Es una barrera de interfaz, no de seguridad:

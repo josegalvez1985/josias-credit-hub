@@ -19,6 +19,7 @@ Todo lo que necesita ese endpoint está en su archivo, no hay que saltar entre c
 | `consultas.sql` | `/consultas/*` | módulo ORDS `consultas` — ficha de cliente (pág. 10). Sin paquete: es lectura pura. Nació para sacar `cliente/:cod_cliente` fuera de `recibos`, que respondía sin cabeceras CORS |
 | `operaciones.sql` | `/operaciones/*` | módulo ORDS `operaciones` — créditos otorgados (pág. 18 de APEX). **Solo lectura y sin paquete**: SQL puro. Alimenta el módulo administrativo |
 | `proveedores.sql` | `/proveedores/*` | `pkg_recibos_compra` + módulo ORDS `proveedores` — recibos de pago a proveedores por facturas de compra a crédito. Primer módulo administrativo **con escritura**: valida token y lista de usuarios en cada handler |
+| `definiciones.sql` | `/definiciones/*` | `pkg_definiciones` + módulo ORDS `definiciones` — ABM de tablas maestras del módulo administrativo (por ahora `PROFESIONES`). Misma guardia que `proveedores` |
 
 **Todo lo de un módulo va en su archivo**, incluidos los cambios de esquema.
 No hay carpeta `migrations/`: los `ALTER`/`DROP` van en una sección de saneamiento
@@ -218,7 +219,8 @@ Estas piezas están en la base pero todavía no en este repo:
 
 - Tablas `SOLICITUD_VENTAS_CABECERA`, `SOLICITUD_VENTAS_DETALLE`,
   `SOLICITUD_VENTAS_ACTIVIDAD_LABORAL`, `CLIENTES`, `ARTICULOS`, `CIUDADES`,
-  `VENDEDORES`, `PROFESIONES`, `RELACIONES_PERSONALES`.
+  `VENDEDORES`, `RELACIONES_PERSONALES`. (`PROFESIONES` quedó resumida en la
+  sección 1 de `definiciones.sql`.)
 - Tablas de compras y proveedores: `PROVEEDORES`, `COMPRAS_CABECERA`,
   `COMPRAS_DETALLE`, `RECIBOS_COMPRA_CABECERA`, `RECIBOS_COMPRA_DETALLE`. Su DDL
   está resumido en la sección 1 de `proveedores.sql`, pero no versionado entero.

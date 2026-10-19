@@ -1039,3 +1039,50 @@ export async function lovProveedores(q?: string): Promise<ProveedorLov[]> {
   const r = await request<{ items: ProveedorLov[] }>("/proveedores/lov/proveedores");
   return filtrarLov(r.items ?? [], q);
 }
+
+// ----- Definiciones (modulo ORDS "definiciones") -----
+//
+// ABM de las tablas maestras (backend/definiciones.sql). Por ahora, solo
+// PROFESIONES. Mismo esquema que "proveedores": plsql/block que devuelven
+// todas las filas sin paginar y validan token + lista de usuarios en Oracle
+// (sin permiso -> 400 con mensaje, no 403).
+
+// `usos_*` cuenta cuántas solicitudes y créditos la tienen cargada. Con alguno
+// > 0 no se puede eliminar (SOLICITUD_VENTAS_ACTIVIDAD_LABORAL no tiene FK, el
+// paquete lo controla a mano).
+export type Profesion = {
+  cod_profesion: number;
+  descripcion: string;
+  usos_solicitudes: number;
+  usos_creditos: number;
+};
+
+export function listarProfesiones() {
+  return request<{ items: Profesion[] }>("/definiciones/profesiones").then((r) => r.items ?? []);
+}
+
+// La descripción la limpia Oracle (espacios de más) y rechaza una repetida sin
+// distinguir mayúsculas. El código lo asigna el trigger BI_PROFESIONES.
+export function crearProfesion(descripcion: string) {
+  return request<{ cod_profesion: number }>("/definiciones/profesiones", {
+    method: "POST",
+    body: JSON.stringify({ descripcion }),
+  });
+}
+
+// Renombra la profesión en todas las solicitudes y créditos que la usan.
+export function actualizarProfesion(codProfesion: number, descripcion: string) {
+  return request(`/definiciones/profesiones/${codProfesion}`, {
+    method: "PUT",
+    body: JSON.stringify({ descripcion }),
+  });
+}
+
+// text/plain por lo mismo que eliminarReciboProveedor: con application/json
+// ORDS intenta parsear el cuerpo vacío del DELETE y corta antes del handler.
+export function eliminarProfesion(codProfesion: number) {
+  return request(`/definiciones/profesiones/${codProfesion}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "text/plain" },
+  });
+}

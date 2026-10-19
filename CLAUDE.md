@@ -23,6 +23,8 @@ abierta es el **módulo administrativo** (`/admin/*`, ERP), de escritorio:
 - **Reportes**: Saldos de Proveedores, PDF A4, con tres alcances (solo saldo / con recibos /
   todos). Sin módulo propio: usa los GET de `proveedores` (`facturas` y `pagos`).
   Ver `GUIA-FRONTEND.md` §10.
+- **Definiciones**: ABM de tablas maestras (`backend/definiciones.sql`). Por ahora solo
+  **Profesiones**. Las próximas se suman como template del mismo módulo y sección del mismo grupo.
 
 Ver `GUIA-BACKEND.md` §7.
 
