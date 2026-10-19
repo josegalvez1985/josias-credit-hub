@@ -1418,6 +1418,130 @@ BEGIN
 
 
   -- ==================================================================
+  -- CHEQUES A VENCER   GET /proveedores/cheques?desde=&hasta=&cod_proveedor=
+  -- ==================================================================
+  -- Los cheques entregados a proveedores (RECIBOS_COMPRA_PAGOS con
+  -- FORMA_PAGO 'CHEQUE') con FECHA_VENCIMIENTO entre desde y hasta
+  -- (YYYY-MM-DD, los dos incluidos y obligatorios). Lo usa el reporte Cheques
+  -- a Vencer (2026-10-19): lo que el proveedor puede cobrar, y se debita de la
+  -- cuenta, cada día.
+  --
+  -- La base no registra si un cheque ya se cobró: un vencimiento anterior a
+  -- hoy quiere decir "ya se pudo cobrar", no "se cobró". Los días que faltan
+  -- los calcula el cliente con la fecha local: SYSDATE es la del servidor.
+  --
+  -- Los cheques de recibos anteriores al 2026-10-19 no existen: esos recibos
+  -- no tienen pagos cargados (ver 1.b).
+  --
+  -- `facturas`: los nros. de las facturas que paga el recibo, como en GET
+  -- recibos. Si el recibo se pagó con varias formas, el cheque cubre una
+  -- parte: el reporte lo dice con `monto_recibo`.
+  ORDS.DEFINE_TEMPLATE(
+      p_module_name    => 'proveedores',
+      p_pattern        => 'cheques',
+      p_priority       => 0,
+      p_etag_type      => 'NONE',
+      p_etag_query     => NULL,
+      p_comments       => NULL);
+
+  ORDS.DEFINE_HANDLER(
+      p_module_name    => 'proveedores',
+      p_pattern        => 'cheques',
+      p_method         => 'GET',
+      p_source_type    => 'plsql/block',
+      p_mimes_allowed  => NULL,
+      p_comments       => NULL,
+      p_source         =>
+'
+      DECLARE
+        l_user  VARCHAR2(255);
+        l_prov  NUMBER;
+        l_desde DATE;
+        l_hasta DATE;
+      BEGIN' || l_guardia || '
+        BEGIN l_prov := TO_NUMBER(:cod_proveedor); EXCEPTION WHEN OTHERS THEN l_prov := NULL; END;
+
+        BEGIN
+          l_desde := TO_DATE(:desde, ''YYYY-MM-DD'');
+          l_hasta := TO_DATE(:hasta, ''YYYY-MM-DD'');
+        EXCEPTION WHEN OTHERS THEN
+          l_desde := NULL;
+        END;
+        IF l_desde IS NULL OR l_hasta IS NULL THEN
+          :status_code := 400;
+          htp.p(''{"success": false, "message": "Faltan las fechas desde y hasta (AAAA-MM-DD)"}'');
+          RETURN;
+        END IF;
+        IF l_desde > l_hasta THEN
+          :status_code := 400;
+          htp.p(''{"success": false, "message": "La fecha desde no puede ser posterior a la fecha hasta"}'');
+          RETURN;
+        END IF;
+
+        apex_json.open_object;
+        apex_json.write(''success'', TRUE);
+        apex_json.open_array(''items'');
+
+        FOR r IN (
+          SELECT pg.id_pago,
+                 pg.nro_documento,
+                 pg.banco,
+                 pg.fecha_emision,
+                 pg.fecha_vencimiento,
+                 pg.monto,
+                 rc.id_recibo,
+                 rc.nro_recibo,
+                 rc.fecha                AS fecha_recibo,
+                 rc.monto_total          AS monto_recibo,
+                 rc.cod_proveedor,
+                 p.nombre                AS proveedor,
+                 NVL(p.ruc, p.ci)        AS documento,
+                 ( SELECT LISTAGG(NVL(c.referencia, ''ID '' || c.id_cabecera), '', '' ON OVERFLOW TRUNCATE)
+                            WITHIN GROUP (ORDER BY c.fecha, c.id_cabecera)
+                     FROM recibos_compra_detalle d
+                     JOIN compras_cabecera c ON c.id_cabecera = d.id_cabecera
+                    WHERE d.id_recibo = rc.id_recibo ) AS facturas
+            FROM recibos_compra_pagos pg
+            JOIN recibos_compra_cabecera rc ON rc.id_recibo = pg.id_recibo
+            LEFT JOIN proveedores p ON p.cod_proveedor = rc.cod_proveedor
+           WHERE pg.forma_pago = ''CHEQUE''
+             AND pg.fecha_vencimiento >= l_desde
+             AND pg.fecha_vencimiento <  l_hasta + 1
+             AND (l_prov IS NULL OR rc.cod_proveedor = l_prov)
+           ORDER BY pg.fecha_vencimiento, p.nombre, pg.id_pago
+        ) LOOP
+          apex_json.open_object;
+          apex_json.write(''id_pago'',           r.id_pago);
+          apex_json.write(''nro_documento'',     r.nro_documento);
+          apex_json.write(''banco'',             r.banco);
+          apex_json.write(''fecha_emision'',     TO_CHAR(r.fecha_emision, ''YYYY-MM-DD''));
+          apex_json.write(''fecha_vencimiento'', TO_CHAR(r.fecha_vencimiento, ''YYYY-MM-DD''));
+          apex_json.write(''monto'',             r.monto);
+          apex_json.write(''id_recibo'',         r.id_recibo);
+          apex_json.write(''nro_recibo'',        r.nro_recibo);
+          apex_json.write(''fecha_recibo'',      TO_CHAR(r.fecha_recibo, ''YYYY-MM-DD''));
+          apex_json.write(''monto_recibo'',      r.monto_recibo);
+          apex_json.write(''cod_proveedor'',     r.cod_proveedor);
+          apex_json.write(''proveedor'',         r.proveedor);
+          apex_json.write(''documento'',         r.documento);
+          apex_json.write(''facturas'',          r.facturas);
+          apex_json.close_object;
+        END LOOP;
+
+        apex_json.close_array;
+        apex_json.close_object;
+      EXCEPTION WHEN OTHERS THEN
+        :status_code := 500;
+        htp.p(''{"success": false, "message": '' || apex_json.stringify(SQLERRM) || ''}'');
+      END;
+    ');
+
+  ORDS.DEFINE_PARAMETER(p_module_name => 'proveedores', p_pattern => 'cheques', p_method => 'GET',
+      p_name => 'authorization', p_bind_variable_name => 'authorization',
+      p_source_type => 'HEADER', p_param_type => 'STRING', p_access_method => 'IN', p_comments => NULL);
+
+
+  -- ==================================================================
   -- LOV   GET /proveedores/lov/proveedores
   -- ==================================================================
   -- Solo los proveedores que tienen alguna factura a crédito: los demás no
@@ -1507,7 +1631,7 @@ END;
 -- 4. VERIFICACIÓN (correr a mano, no es parte del despliegue)
 -- =====================================================================
 
--- 4.a  ¿Quedaron los nueve handlers?
+-- 4.a  ¿Quedaron los diez handlers?
 --
 --   SELECT t.uri_template, h.method, h.source_type
 --     FROM user_ords_modules p
@@ -1516,10 +1640,12 @@ END;
 --    WHERE p.name = 'proveedores'
 --    ORDER BY t.uri_template, h.method;
 --
--- Tienen que ser exactamente estas nueve filas (`pagos` se agregó el
+-- Tienen que ser exactamente estas diez filas (`pagos` se agregó el
 -- 2026-09-24 para el reporte, `facturas/:id/articulos` el 2026-10-14 para el
--- modal del detalle y `compras` el 2026-10-19 para Compras por Período; si
--- falta alguna, el módulo es el de antes):
+-- modal del detalle, `compras` el 2026-10-19 para Compras por Período y
+-- `cheques` el mismo día para Cheques a Vencer; si falta alguna, el módulo
+-- es el de antes):
+--   cheques                 GET     plsql/block
 --   compras                 GET     plsql/block
 --   facturas                GET     plsql/block
 --   facturas/:id/articulos  GET     plsql/block
@@ -1554,6 +1680,8 @@ END;
 --   curl -i "$B/pagos"                                  -H "Authorization: Bearer $TOKEN"
 --   curl -i "$B/compras?desde=2026-09-01&hasta=2026-09-30" -H "Authorization: Bearer $TOKEN"
 --     -> motivo C y E. Sin fechas, o desde > hasta -> 400 con mensaje.
+--   curl -i "$B/cheques?desde=2026-10-01&hasta=2026-12-31" -H "Authorization: Bearer $TOKEN"
+--     -> solo forma CHEQUE, ordenados por vencimiento. Mismos 400 que compras.
 --   curl -i "$B/facturas/<ID>/articulos"                -H "Authorization: Bearer $TOKEN"
 --     -> la suma redondeada de los `subtotal` tiene que dar el `total` de
 --        esa factura en `facturas`. Un ID que no existe -> 404.

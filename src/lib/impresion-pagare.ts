@@ -17,8 +17,13 @@
 //     blanco: un "0%" impreso diría que no se devenga interés durante la mora.
 //   - El monto en letras sale de NUM_LETRAS en Oracle, la misma función que
 //     usa el recibo térmico.
-//   - Los datos del codeudor (nombre, domicilio, cédula) van SIEMPRE EN BLANCO:
-//     VENTAS_REFERENCIAS no guarda domicilio ni cédula del garante.
+//   - Los datos del codeudor (nombre, domicilio, cédula) iban SIEMPRE EN BLANCO:
+//     VENTAS_REFERENCIAS no guardaba la cédula del garante.
+//     (2026-10-19) Ahora la guarda (NRO_DOCUMENTO): si el crédito tiene UN solo
+//     garante, se imprimen su nombre y su cédula. Con varios garantes, o
+//     ninguno, sigue en blanco: cuál firma como codeudor se decide al firmar.
+//     El domicilio queda SIEMPRE en blanco: de la dirección del garante solo
+//     se guarda la de la empresa (EMPRESA_CALLE_NRO), no la de su casa.
 //   - (2026-08-08) El bloque del pagaré se llena A MANO al firmarlo: salen en
 //     blanco "Vencimiento:", "El día __ de ______", "Pagaré a: ______" y la
 //     fecha de emisión de "Capiatá __ de ______ de 20__". Del crédito solo se
@@ -27,7 +32,7 @@
 // Igual que el impreso de la solicitud: HTML + window.print() en pestaña
 // nueva, sin dependencias. Ver src/lib/impresion-solicitud.ts.
 
-import type { CreditoCabecera } from "./api";
+import type { CreditoCabecera, CreditoReferencia } from "./api";
 
 // Datos fijos de la empresa. Están acá y no en la base porque el formulario
 // preimpreso los tiene fijos; si cambian, se cambian una sola vez.
@@ -61,8 +66,9 @@ function campo(label: string, valor: unknown, ancho = "auto"): string {
 // El par de firmas al pie de cada bloque. Va dos veces por bloque: izquierda
 // el deudor, derecha el codeudor.
 //
-// Los datos del codeudor van vacíos a propósito (ver cabecera del archivo).
-function firmas(nombre = "", domicilio = "", cedula = ""): string {
+// Del codeudor van nombre y cédula si hay un único garante; el domicilio,
+// siempre vacío (ver cabecera del archivo).
+function firmas(nombre = "", domicilio = "", cedula = "", codeudor?: Codeudor): string {
   const col = (n: string, dom: string, ced: string) => `
     <div class="fcol">
       <div class="flinea"></div>
@@ -71,11 +77,25 @@ function firmas(nombre = "", domicilio = "", cedula = ""): string {
       <div class="fdato"><span>Domicilio:</span><span class="lin">${esc(dom)}</span></div>
       <div class="fdato"><span>Cedula de Identidad N°:</span><span class="lin">${esc(ced)}</span></div>
     </div>`;
-  // Izquierda el titular con sus datos, derecha el codeudor en blanco.
-  return `<div class="firmas">${col(nombre, domicilio, cedula)}${col("", "", "")}</div>`;
+  // Izquierda el titular con sus datos, derecha el codeudor.
+  return `<div class="firmas">${col(nombre, domicilio, cedula)}${col(
+    codeudor?.nombre ?? "",
+    "",
+    codeudor?.cedula ?? "",
+  )}</div>`;
 }
 
-function construirHtml(c: CreditoCabecera): string {
+export type Codeudor = { nombre: string; cedula: string };
+
+// El codeudor del pagaré: el garante del crédito, solo si hay exactamente uno.
+export function codeudorDe(referencias: CreditoReferencia[]): Codeudor | undefined {
+  const garantes = referencias.filter((r) => r.ind_garante === "S");
+  if (garantes.length !== 1) return undefined;
+  const g = garantes[0];
+  return { nombre: g.nombre_apellido ?? "", cedula: g.nro_documento ?? "" };
+}
+
+function construirHtml(c: CreditoCabecera, codeudor?: Codeudor): string {
   // Domicilio del titular: dirección + nro de casa + ciudad, lo que haya.
   const domicilio = [c.direccion, c.nro_casa ? `N° ${c.nro_casa}` : null, c.ciudad_cliente]
     .filter(Boolean)
@@ -255,7 +275,7 @@ ${
       crediticia
     </p>
 
-    ${firmas(titular, domicilio, c.documento ?? "")}
+    ${firmas(titular, domicilio, c.documento ?? "", codeudor)}
   </div>
 
   <!-- ============ BLOQUE 2: PAGARÉ A LA ORDEN ============ -->
@@ -332,7 +352,7 @@ ${
       especial en los lugares indicados en el presente documento.
     </p>
 
-    ${firmas(titular, domicilio, c.documento ?? "")}
+    ${firmas(titular, domicilio, c.documento ?? "", codeudor)}
   </div>
 
 </div>
@@ -342,14 +362,14 @@ ${
 }
 
 // Abre el pagaré en una pestaña nueva, igual que el impreso de la solicitud.
-export function imprimirPagare(c: CreditoCabecera): void {
+export function imprimirPagare(c: CreditoCabecera, codeudor?: Codeudor): void {
   const win = window.open("", "_blank");
   if (!win) {
     throw new Error(
       "El navegador bloqueó la ventana emergente. Permitila para este sitio y volvé a intentar.",
     );
   }
-  win.document.write(construirHtml(c));
+  win.document.write(construirHtml(c, codeudor));
   win.document.close();
 
   // Igual que la solicitud: el diálogo se abre solo y al usuario solo le queda

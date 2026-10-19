@@ -1,6 +1,7 @@
 -- =====================================================================
 -- ENDPOINT: /operaciones  —  "Solicitud de Créditos" (Créditos Otorgados)
--- Contiene: solo el módulo ORDS. Sin paquete y sin DDL: es de lectura pura.
+-- Contiene: solo el módulo ORDS. Sin paquete y sin DDL: es de lectura pura
+-- (el ALTER de VENTAS_REFERENCIAS de la sección 1.a ya está aplicado).
 -- Correr como WKSP_JOSIASMUEBLES.
 --
 -- Migra la página 18 de la app APEX 70967 ("Facturas" / Créditos Otorgados),
@@ -44,13 +45,52 @@
 -- =====================================================================
 -- 1. SANEAMIENTO
 -- =====================================================================
--- Nada que sanear: este módulo no crea ni altera objetos. Todas las tablas
--- que lee ya existen en producción y no se tocan.
+-- El módulo no crea ni altera objetos. Lo único de esta sección son cambios
+-- de esquema que Jose aplica a mano, comentados, con su rollback.
 --
 -- Las tablas VENTAS_* todavía no están versionadas en este repo (igual que
 -- CLIENTES, ARTICULOS y las demás; ver backend/README.md → "Pendiente de
 -- versionar"). El DDL de las cuatro se recibió el 2026-08-06 y está resumido
 -- en la cabecera de este archivo y en GUIA-BACKEND.md §7.
+--
+-- 1.a  Cédula y datos del garante en VENTAS_REFERENCIAS (2026-10-19)  [YA APLICADO]
+-- ---------------------------------------------------------------------
+-- Jose agregó a mano las mismas trece columnas que en
+-- SOLICITUD_VENTAS_REFERENCIAS (ver la cabecera de backend/solicitudes.sql),
+-- con el mismo tipo. Todas admiten NULL: los créditos anteriores quedan con
+-- ellas vacías.
+--
+--   NRO_DOCUMENTO        VARCHAR2(20)
+--   ES_EMPLEADO          VARCHAR2(1)    CHECK IN ('S','N')  (sin nombre, SYS_C...)
+--   ANTIGUEDAD_ANIOS     NUMBER(3,0)
+--   COD_PROFESION        NUMBER         FK VENTAS_REFERENCIAS_FK_PROF -> PROFESIONES
+--                                       índice VENTAS_REFERENCIAS_PROF_IDX
+--   EMPRESA_NOMBRE / _TELEFONO / _CIUDAD / _CALLE_NRO   VARCHAR2(200)
+--   PUESTO               VARCHAR2(200)
+--   INGRESOS_MENSUALES   NUMBER(15,2)
+--   POSEE_OTROS_INGRESOS VARCHAR2(1)    CHECK IN ('S','N')  (sin nombre)
+--   CONCEPTOS            VARCHAR2(400)
+--   APORTA_IPS           VARCHAR2(1)    CHECK IN ('S','N')  (sin nombre)
+--
+-- Qué NO cambia: VENTAS_REFERENCIAS solo tiene BI_VENTAS_REFERENCIAS
+-- (ID_DETALLE desde la secuencia), que no mira estas columnas. Los triggers
+-- de VENTAS_CABECERA (plan de cuotas) no se tocan.
+--
+-- Las llena TRG_APROBAR_SOLICITUD al aprobar la solicitud: el trigger
+-- versionado en backend/solicitudes.sql (sección 0) ya las copia. Este
+-- módulo las devuelve en GET credito/:id/referencias.
+--
+-- Rollback (borra lo que se haya cargado en esas columnas; ANTES volver a
+-- poner el trigger sin ellas, o la próxima aprobación falla con ORA-00904).
+-- Los tres CHECK no tienen nombre: se van solos con su columna.
+--
+--   DROP INDEX ventas_referencias_prof_idx;
+--   ALTER TABLE ventas_referencias DROP CONSTRAINT ventas_referencias_fk_prof;
+--   ALTER TABLE ventas_referencias DROP (
+--     nro_documento, es_empleado, antiguedad_anios, cod_profesion,
+--     empresa_nombre, empresa_telefono, empresa_ciudad, empresa_calle_nro,
+--     puesto, ingresos_mensuales, posee_otros_ingresos, conceptos, aporta_ips
+--   );
 
 
 -- =====================================================================
@@ -380,6 +420,10 @@ BEGIN
   --     vez de aparecer vacía.
   --
   -- Se replica tal cual está en producción; no se corrige el modelo desde acá.
+  --
+  -- Desde el 2026-10-19 trae también la cédula (cualquier referencia) y los
+  -- datos laborales del garante (ver 1.a), con la profesión ya resuelta. Los
+  -- créditos aprobados antes los tienen en NULL.
   ORDS.DEFINE_TEMPLATE(
       p_module_name    => 'operaciones',
       p_pattern        => 'credito/:id/referencias',
@@ -402,10 +446,26 @@ BEGIN
              NVL(rp.descripcion, vr.relacion) AS relacion_desc,
              vr.telefono,
              vr.nombre_apellido,
-             vr.ind_garante
+             vr.ind_garante,
+             vr.nro_documento,
+             vr.es_empleado,
+             vr.antiguedad_anios,
+             vr.cod_profesion,
+             pr.descripcion AS profesion,
+             vr.empresa_nombre,
+             vr.empresa_telefono,
+             vr.empresa_ciudad,
+             vr.empresa_calle_nro,
+             vr.puesto,
+             vr.ingresos_mensuales,
+             vr.posee_otros_ingresos,
+             vr.conceptos,
+             vr.aporta_ips
       FROM   ventas_referencias vr
       LEFT   JOIN relaciones_personales rp
              ON  TO_CHAR(rp.cod_relacion) = TRIM(vr.relacion)
+      LEFT   JOIN profesiones pr
+             ON  pr.cod_profesion = vr.cod_profesion
       WHERE  vr.id = :id
       ORDER  BY vr.ind_garante DESC, vr.id_detalle
     ');

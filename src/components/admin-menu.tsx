@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   BookMarked,
   Briefcase,
+  CalendarClock,
   ChartColumn,
   FileChartColumn,
   FileSpreadsheet,
@@ -89,6 +90,12 @@ export const GRUPOS_ADMIN: GrupoAdmin[] = [
         label: "Compras por Período",
         descripcion: "PDF de las facturas de compra, contado y crédito, entre dos fechas",
         icon: ShoppingCart,
+      },
+      {
+        to: "/admin/reportes/cheques",
+        label: "Cheques a Vencer",
+        descripcion: "PDF de los cheques a proveedores por fecha de vencimiento",
+        icon: CalendarClock,
       },
     ],
   },

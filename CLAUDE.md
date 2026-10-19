@@ -25,6 +25,8 @@ abierta es el **módulo administrativo** (`/admin/*`, ERP), de escritorio:
   - **Saldos de Proveedores**: tres alcances (solo saldo / con recibos / todos), con `facturas` y `pagos`.
   - **Compras por Período**: facturas de compra contado y crédito entre dos fechas, con `compras`.
     `TIPO = 'C'` con `MOTIVO` `'C'` (compra) o `'E'` (entrada), y **sin IVA**: la base no guarda la tasa.
+  - **Cheques a Vencer**: cheques entregados a proveedores, agrupados por día de vencimiento, con
+    `cheques`. La base **no registra si un cheque se cobró**: vencido = "ya se pudo cobrar".
 - **Definiciones**: ABM de tablas maestras (`backend/definiciones.sql`). Por ahora solo
   **Profesiones**. Las próximas se suman como template del mismo módulo y sección del mismo grupo.
 

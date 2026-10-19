@@ -265,13 +265,69 @@ function SolicitudDetalle() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {r.relacion ? `${labels.relaciones.get(r.relacion) ?? `Relación ${r.relacion}`} · ` : ""}{r.telefono}
+                  {[
+                    r.relacion ? (labels.relaciones.get(r.relacion) ?? `Relación ${r.relacion}`) : "",
+                    r.telefono,
+                    r.nro_documento && `CI ${r.nro_documento}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
+                {r.ind_garante === "S" && <DatosGaranteView r={r} profesiones={labels.profesiones} />}
               </div>
             ))}
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+// Datos laborales del garante (2026-10-19). Las solicitudes anteriores no los
+// tienen: en ese caso no se dibuja nada en vez de once "—".
+function DatosGaranteView({ r, profesiones }: { r: ReferenciaRow; profesiones: Map<number, string> }) {
+  const sn = (v?: string | null) => (v === "S" ? "Sí" : v === "N" ? "No" : undefined);
+  const hayDatos = [
+    r.es_empleado,
+    r.antiguedad_anios,
+    r.cod_profesion,
+    r.empresa_nombre,
+    r.empresa_telefono,
+    r.empresa_ciudad,
+    r.empresa_calle_nro,
+    r.puesto,
+    r.ingresos_mensuales,
+    r.posee_otros_ingresos,
+    r.aporta_ips,
+  ].some((v) => v != null && v !== "");
+  if (!hayDatos) return null;
+
+  return (
+    <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 border-t border-border pt-3 sm:grid-cols-2">
+      <Row
+        label="Situación"
+        value={r.es_empleado === "S" ? "Empleado" : r.es_empleado === "N" ? "Independiente" : undefined}
+      />
+      <Row label="Empresa / Negocio" value={r.empresa_nombre ?? undefined} />
+      <Row label="Puesto / Ocupación" value={r.puesto ?? undefined} />
+      <Row
+        label="Profesión"
+        value={r.cod_profesion ? (profesiones.get(r.cod_profesion) ?? `Profesión ${r.cod_profesion}`) : undefined}
+      />
+      <Row
+        label="Antigüedad"
+        value={r.antiguedad_anios != null ? `${r.antiguedad_anios} ${r.antiguedad_anios === 1 ? "año" : "años"}` : undefined}
+      />
+      <Row
+        label="Ingresos mensuales"
+        value={r.ingresos_mensuales != null ? formatCurrency(r.ingresos_mensuales) : undefined}
+      />
+      <Row label="Teléfono de la empresa" value={r.empresa_telefono ?? undefined} />
+      <Row label="Ciudad de la empresa" value={r.empresa_ciudad ?? undefined} />
+      <Row label="Calle y número" value={r.empresa_calle_nro ?? undefined} />
+      <Row label="Aporta IPS" value={sn(r.aporta_ips)} />
+      <Row label="Otros ingresos" value={sn(r.posee_otros_ingresos)} />
+      {r.posee_otros_ingresos === "S" && r.conceptos && <Row label="Conceptos" value={r.conceptos} />}
     </div>
   );
 }

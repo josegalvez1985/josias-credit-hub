@@ -122,17 +122,71 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
 
   const filasReferencias =
     d.referencias.length === 0
-      ? `<tr><td colspan="4" class="vacio">Sin referencias</td></tr>`
+      ? `<tr><td colspan="5" class="vacio">Sin referencias</td></tr>`
       : d.referencias
           .map(
             (r) => `<tr>
               <td>${esc(r.relacion_desc ?? r.relacion)}</td>
               <td>${esc(r.nombre_apellido)}</td>
+              <td>${esc(r.nro_documento)}</td>
               <td>${esc(r.telefono)}</td>
               <td class="centro">${sn(r.ind_garante)}</td>
             </tr>`,
           )
           .join("");
+
+  // Datos laborales de los garantes (2026-10-19). No está en la página 57 de
+  // APEX: se agrega solo si algún garante los tiene, así un crédito aprobado
+  // antes sale igual que siempre.
+  const garantes = d.referencias.filter(
+    (r) =>
+      r.ind_garante === "S" &&
+      [
+        r.es_empleado,
+        r.antiguedad_anios,
+        r.cod_profesion,
+        r.empresa_nombre,
+        r.empresa_telefono,
+        r.empresa_ciudad,
+        r.empresa_calle_nro,
+        r.puesto,
+        r.ingresos_mensuales,
+        r.posee_otros_ingresos,
+        r.aporta_ips,
+      ].some((v) => v != null && v !== ""),
+  );
+  const bloquesGarante = garantes
+    .map(
+      (r, i) => `
+      <div class="lab${i > 0 ? " sep" : ""}">
+        <div class="cols">
+          ${kv("Garante", r.nombre_apellido)}
+          ${kv("Cédula", r.nro_documento)}
+          ${kv("¿Es empleado?", sn(r.es_empleado ?? undefined))}
+        </div>
+        <div class="cols">
+          ${kv("Empresa", r.empresa_nombre)}
+          ${kv("Cargo", r.puesto)}
+          ${kv("Profesión", r.profesion)}
+        </div>
+        <div class="cols">
+          ${kv("Antigüedad", r.antiguedad_anios != null ? `${r.antiguedad_anios} ${r.antiguedad_anios === 1 ? "año" : "años"}` : "")}
+          ${kv("Ing. Mensuales", r.ingresos_mensuales != null ? gs(r.ingresos_mensuales) : "")}
+          ${kv("Aporta IPS", sn(r.aporta_ips ?? undefined))}
+        </div>
+        <div class="cols">
+          ${kv("Teléfono", r.empresa_telefono)}
+          ${kv("Ciudad", r.empresa_ciudad)}
+          ${kv("Dirección", r.empresa_calle_nro)}
+        </div>
+        ${
+          r.posee_otros_ingresos === "S"
+            ? `<div class="cols">${kv("Otros Ingresos", r.conceptos || "Sí")}</div>`
+            : ""
+        }
+      </div>`,
+    )
+    .join("");
 
   const titulo = `Solicitud ${c.nro_solicitud ?? c.id}`;
 
@@ -331,12 +385,20 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
       <tr>
         <th>Relación</th>
         <th>Nombre y Apellido</th>
+        <th style="width:24mm">Cédula</th>
         <th>Teléfono</th>
         <th class="centro" style="width:20mm">Garante</th>
       </tr>
     </thead>
     <tbody>${filasReferencias}</tbody>
   </table>
+${
+  bloquesGarante
+    ? `
+  <h2 style="margin-top:6mm">Datos Laborales del Garante</h2>
+  ${bloquesGarante}`
+    : ""
+}
 
   <div class="firmas">
     <div class="firma">Firma del Solicitante</div>

@@ -1,11 +1,35 @@
 -- =====================================================================
 -- ENDPOINT: /solicitudes  —  cabecera, detalle, referencias, actividad,
 --                            LOVs y precios.
--- Contiene: paquete + módulo ORDS. Sin DDL (las tablas se crean aparte).
+-- Contiene: trigger TRG_APROBAR_SOLICITUD (sección 0) + paquete + módulo
+-- ORDS. Sin DDL de tablas (se crean aparte).
 -- Correr como WKSP_JOSIASMUEBLES. Es idempotente: se puede volver a correr.
 --
 -- Base: export de ORDS 26.2.0 del 2026-07-24, con estos cambios:
 --   * POST/PUT de referencias mandan :ind_garante.
+--   * 2026-10-19: POST/PUT de referencias mandan también :nro_documento
+--     (cédula, cualquier referencia) y los datos laborales del garante
+--     (:es_empleado ... :aporta_ips). Jose agregó las columnas a mano en
+--     SOLICITUD_VENTAS_REFERENCIAS:
+--       NRO_DOCUMENTO        VARCHAR2(20)
+--       ES_EMPLEADO          VARCHAR2(1)    CHECK IN ('S','N')
+--       ANTIGUEDAD_ANIOS     NUMBER(3,0)
+--       COD_PROFESION        NUMBER         FK PROFESIONES (SOLICITUD_VENTAS_REF_PROF_FK)
+--       EMPRESA_NOMBRE / _TELEFONO / _CIUDAD / _CALLE_NRO   VARCHAR2(200)
+--                            (la ciudad es texto libre, no COD_CIUDAD)
+--       PUESTO               VARCHAR2(200)
+--       INGRESOS_MENSUALES   NUMBER(15,2)
+--       POSEE_OTROS_INGRESOS VARCHAR2(1)    CHECK IN ('S','N')
+--       CONCEPTOS            VARCHAR2(400)
+--       APORTA_IPS           VARCHAR2(1)    CHECK IN ('S','N')
+--     Todas opcionales. El paquete las deja NULL si la referencia no es garante.
+--
+-- DESPLIEGUE: el trigger (sección 0) va solo, en su propia ejecución, y es
+-- independiente del resto. El módulo, igual que los demás (backend/README.md),
+-- en tres ejecuciones: (1) la sección 1, el paquete · (2) el
+-- ORDS.DELETE_MODULE de 'solicitudes' solo, verificando que el conteo dé 0 ·
+-- (3) la sección 2.
+-- Es el módulo de los asesores en la calle: hacerlo en un horario sin carga.
 --   * Se unieron los literales que el exportador partía en dos
 --     (':s' || 'tatus_code'); es texto equivalente.
 --
@@ -13,6 +37,120 @@
 -- _ACTIVIDAD_LABORAL, CLIENTES, ARTICULOS, CIUDADES, VENDEDORES,
 -- PROFESIONES, RELACIONES_PERSONALES y la vista V_PRECIOS_VENTAS.
 -- =====================================================================
+
+
+-- ---------------------------------------------------------------------
+-- 0. TRIGGER TRG_APROBAR_SOLICITUD  (correr aparte, una sola vez)
+-- ---------------------------------------------------------------------
+-- Es el que convierte la solicitud en crédito: al pasar ESTADO a 'APROBADA'
+-- copia cabecera, detalle, referencias y actividad a las tablas VENTAS_*.
+-- Estaba solo en la base; se versiona acá el 2026-10-19 porque hubo que
+-- tocarlo.
+--
+-- ÚNICO CAMBIO contra el que está en producción: el INSERT de REFERENCIAS
+-- (punto 3) copia también la cédula y los datos del garante. Antes copiaba
+-- solo relacion, telefono, nombre_apellido e ind_garante, y esos datos se
+-- quedaban en la solicitud. El resto está textual, incluidos los comentarios
+-- repetidos del correlativo.
+--
+-- Requiere que las dos tablas ya tengan las columnas (en las dos ya están,
+-- 2026-10-19). Si faltara alguna, el trigger compila INVALID y la próxima
+-- aprobación falla con ORA-04098 — y en el celular el asesor no puede
+-- aprobar nada.
+--
+-- Después de correrlo:
+--   SELECT status FROM user_objects WHERE object_name = 'TRG_APROBAR_SOLICITUD';
+--   -> VALID
+--
+-- Rollback: volver a crearlo con el INSERT de referencias de antes:
+--   INSERT INTO ventas_referencias (id, relacion, telefono, nombre_apellido, ind_garante)
+--   SELECT l_ventas_id, r.relacion, r.telefono, r.nombre_apellido, r.ind_garante
+--   FROM   solicitud_ventas_referencias r
+--   WHERE  r.id = :NEW.id;
+
+CREATE OR REPLACE EDITIONABLE TRIGGER "TRG_APROBAR_SOLICITUD"
+AFTER UPDATE OF estado ON solicitud_ventas_cabecera
+FOR EACH ROW
+ WHEN (NEW.estado = 'APROBADA' AND NVL(OLD.estado, '~') <> 'APROBADA') DECLARE
+  l_ventas_id   ventas_cabecera.id%TYPE;
+  l_nro         ventas_cabecera.nro_solicitud%TYPE;
+  l_existe      NUMBER;
+BEGIN
+  -- Evitar duplicar la venta si esta solicitud ya fue aprobada antes
+  SELECT COUNT(*) INTO l_existe
+  FROM   ventas_cabecera
+  WHERE  id_solicitud = :NEW.id;
+
+  IF l_existe > 0 THEN
+    RETURN;
+  END IF;
+
+  -- Numero correlativo desde 100000: MAX actual + 1
+-- Numero correlativo: siempre superior a 100000
+SELECT GREATEST(NVL(MAX(nro_solicitud), 0), 100000) + 1
+INTO   l_nro
+FROM   ventas_cabecera;
+  ----------------------------------------------------------------------------
+  -- 1) CABECERA  (el ID de la venta lo genera BI_VENTAS_CABECERA)
+  ----------------------------------------------------------------------------
+  INSERT INTO ventas_cabecera (
+    nro_solicitud, fecha_factura, referencia, cod_cliente, cantidad_cuotas,
+    total, monto_cuota, cod_ciudad, cod_vendedor, fec_vencimiento_inicial,
+    entrega_inicial, porc_interes, id_solicitud
+  ) VALUES (
+    l_nro, :NEW.fecha_factura, :NEW.referencia, :NEW.cod_cliente,
+    :NEW.cantidad_cuotas, :NEW.total, :NEW.monto_cuota, :NEW.cod_ciudad,
+    :NEW.cod_vendedor, :NEW.fec_vencimiento_inicial, :NEW.entrega_inicial,
+    :NEW.porc_interes, :NEW.id
+  ) RETURNING id INTO l_ventas_id;
+
+  ----------------------------------------------------------------------------
+  -- 2) DETALLE (articulos)   ID_DETALLE lo genera BI_VENTAS_DETALLE
+  ----------------------------------------------------------------------------
+  INSERT INTO ventas_detalle (id, cod_articulo, cantidad, precio_unitario)
+  SELECT l_ventas_id, d.cod_articulo, d.cantidad, d.precio_unitario
+  FROM   solicitud_ventas_detalle d
+  WHERE  d.id = :NEW.id;
+
+  ----------------------------------------------------------------------------
+  -- 3) REFERENCIAS   (2026-10-19: + cédula y datos laborales del garante)
+  ----------------------------------------------------------------------------
+    INSERT INTO ventas_referencias (
+      id, relacion, telefono, nombre_apellido, ind_garante,
+      nro_documento, es_empleado, antiguedad_anios, cod_profesion,
+      empresa_nombre, empresa_telefono, empresa_ciudad, empresa_calle_nro,
+      puesto, ingresos_mensuales, posee_otros_ingresos, conceptos, aporta_ips
+    )
+    SELECT l_ventas_id, r.relacion, r.telefono, r.nombre_apellido, r.ind_garante,
+           r.nro_documento, r.es_empleado, r.antiguedad_anios, r.cod_profesion,
+           r.empresa_nombre, r.empresa_telefono, r.empresa_ciudad, r.empresa_calle_nro,
+           r.puesto, r.ingresos_mensuales, r.posee_otros_ingresos, r.conceptos, r.aporta_ips
+    FROM   solicitud_ventas_referencias r
+    WHERE  r.id = :NEW.id;
+
+  ----------------------------------------------------------------------------
+  -- 4) ACTIVIDAD LABORAL
+  ----------------------------------------------------------------------------
+  INSERT INTO ventas_actividad_laboral (
+    id, es_empleado, nombre_empresa, direccion, puesto_ocupado,
+    ingresos_mensuales, otros_ingresos, antiguedad, telefono,
+    cod_profesion, cod_ciudad, aporta_ips
+  )
+  SELECT l_ventas_id, al.es_empleado, al.nombre_empresa, al.direccion,
+         al.puesto_ocupado, al.ingresos_mensuales, al.otros_ingresos,
+         al.antiguedad, al.telefono, al.cod_profesion, al.cod_ciudad,
+         al.aporta_ips
+  FROM   solicitud_ventas_actividad_laboral al
+  WHERE  al.id = :NEW.id;
+
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE_APPLICATION_ERROR(-20050,
+      'No se pudo generar la venta al aprobar la solicitud ' ||
+      :NEW.id || ': ' || SQLERRM);
+END;
+/
+ALTER TRIGGER "TRG_APROBAR_SOLICITUD" ENABLE;
 
 
 -- ---------------------------------------------------------------------
@@ -80,20 +218,52 @@ CREATE OR REPLACE PACKAGE pkg_solicitud_ventas AS
   --------------------------------------------------------------- REFERENCIAS
   -- p_ind_garante: 'S' si la referencia además es garante. Default 'N' para no
   -- romper llamadas viejas que no mandan el campo.
+  --
+  -- p_nro_documento (2026-10-19): cédula de cualquier referencia, garante o no.
+  -- El resto (de p_es_empleado a p_aporta_ips) son los datos laborales del
+  -- garante: solo se guardan si p_ind_garante = 'S'; en una referencia común
+  -- van NULL aunque lleguen. Todos opcionales (decisión de Jose) y con DEFAULT
+  -- NULL, igual que p_ind_garante.
   FUNCTION ins_referencia(
-    p_id              NUMBER,
-    p_relacion        VARCHAR2,
-    p_telefono        VARCHAR2,
-    p_nombre_apellido VARCHAR2,
-    p_ind_garante     VARCHAR2 DEFAULT 'N'
+    p_id                   NUMBER,
+    p_relacion             VARCHAR2,
+    p_telefono             VARCHAR2,
+    p_nombre_apellido      VARCHAR2,
+    p_ind_garante          VARCHAR2 DEFAULT 'N',
+    p_nro_documento        VARCHAR2 DEFAULT NULL,
+    p_es_empleado          VARCHAR2 DEFAULT NULL,
+    p_antiguedad_anios     NUMBER   DEFAULT NULL,
+    p_cod_profesion        NUMBER   DEFAULT NULL,
+    p_empresa_nombre       VARCHAR2 DEFAULT NULL,
+    p_empresa_telefono     VARCHAR2 DEFAULT NULL,
+    p_empresa_ciudad       VARCHAR2 DEFAULT NULL,
+    p_empresa_calle_nro    VARCHAR2 DEFAULT NULL,
+    p_puesto               VARCHAR2 DEFAULT NULL,
+    p_ingresos_mensuales   NUMBER   DEFAULT NULL,
+    p_posee_otros_ingresos VARCHAR2 DEFAULT NULL,
+    p_conceptos            VARCHAR2 DEFAULT NULL,
+    p_aporta_ips           VARCHAR2 DEFAULT NULL
   ) RETURN NUMBER;
 
   PROCEDURE upd_referencia(
-    p_id_detalle      NUMBER,
-    p_relacion        VARCHAR2,
-    p_telefono        VARCHAR2,
-    p_nombre_apellido VARCHAR2,
-    p_ind_garante     VARCHAR2 DEFAULT 'N'
+    p_id_detalle           NUMBER,
+    p_relacion             VARCHAR2,
+    p_telefono             VARCHAR2,
+    p_nombre_apellido      VARCHAR2,
+    p_ind_garante          VARCHAR2 DEFAULT 'N',
+    p_nro_documento        VARCHAR2 DEFAULT NULL,
+    p_es_empleado          VARCHAR2 DEFAULT NULL,
+    p_antiguedad_anios     NUMBER   DEFAULT NULL,
+    p_cod_profesion        NUMBER   DEFAULT NULL,
+    p_empresa_nombre       VARCHAR2 DEFAULT NULL,
+    p_empresa_telefono     VARCHAR2 DEFAULT NULL,
+    p_empresa_ciudad       VARCHAR2 DEFAULT NULL,
+    p_empresa_calle_nro    VARCHAR2 DEFAULT NULL,
+    p_puesto               VARCHAR2 DEFAULT NULL,
+    p_ingresos_mensuales   NUMBER   DEFAULT NULL,
+    p_posee_otros_ingresos VARCHAR2 DEFAULT NULL,
+    p_conceptos            VARCHAR2 DEFAULT NULL,
+    p_aporta_ips           VARCHAR2 DEFAULT NULL
   );
 
   PROCEDURE del_referencia(p_id_detalle NUMBER);
@@ -131,10 +301,42 @@ CREATE OR REPLACE PACKAGE pkg_solicitud_ventas AS
 
   PROCEDURE del_actividad(p_id_detalle NUMBER);
 
+  --------------------------------------------------------------- PROFESIONES
+  -- Alta de una profesión desde el wizard (2026-10-19), para cualquier asesor
+  -- con token válido (decisión de Jose). Mismas reglas que
+  -- pkg_definiciones.profesion_crear, pero sin la lista de administradores:
+  -- descripción sin espacios de más, hasta 200 caracteres, y no repetida sin
+  -- distinguir mayúsculas. Devuelve el COD_PROFESION que pone BI_PROFESIONES.
+  --
+  -- No llama a pkg_definiciones a propósito: si ese paquete queda INVALID (o
+  -- no está desplegado), este body también, y se caen todas las solicitudes.
+  FUNCTION ins_profesion(p_descripcion VARCHAR2) RETURN NUMBER;
+
 END pkg_solicitud_ventas;
 /
 
 CREATE OR REPLACE PACKAGE BODY pkg_solicitud_ventas AS
+
+  -- ⚠ Los TIPOS van acá arriba, antes de cualquier FUNCTION/PROCEDURE: en un
+  -- package body una declaración después de un subprograma no compila
+  -- (PLS-00103 "Se ha encontrado el símbolo TYPE"). Pasó el 2026-10-19 y dejó
+  -- el body INVALID: todos los POST/PUT de solicitudes respondían error.
+  --
+  -- Datos laborales del garante, ya normalizados (ver datos_garante).
+  TYPE t_garante IS RECORD (
+    es_empleado          VARCHAR2(1),
+    antiguedad_anios     NUMBER,
+    cod_profesion        NUMBER,
+    empresa_nombre       VARCHAR2(200),
+    empresa_telefono     VARCHAR2(200),
+    empresa_ciudad       VARCHAR2(200),
+    empresa_calle_nro    VARCHAR2(200),
+    puesto               VARCHAR2(200),
+    ingresos_mensuales   NUMBER,
+    posee_otros_ingresos VARCHAR2(1),
+    conceptos            VARCHAR2(400),
+    aporta_ips           VARCHAR2(1)
+  );
 
   --------------------------------------------------------------- CABECERA
   FUNCTION ins_cabecera(
@@ -259,39 +461,155 @@ CREATE OR REPLACE PACKAGE BODY pkg_solicitud_ventas AS
     RETURN CASE WHEN UPPER(TRIM(p_valor)) = 'S' THEN 'S' ELSE 'N' END;
   END norm_garante;
 
+  -- ES_EMPLEADO, POSEE_OTROS_INGRESOS y APORTA_IPS admiten NULL, pero sus CHECK
+  -- solo aceptan 'S'/'N': cualquier otro valor se guarda NULL (sin dato) en
+  -- vez de tirar ORA-02290.
+  FUNCTION norm_sn(p_valor VARCHAR2) RETURN VARCHAR2 IS
+  BEGIN
+    RETURN CASE UPPER(TRIM(p_valor)) WHEN 'S' THEN 'S' WHEN 'N' THEN 'N' END;
+  END norm_sn;
+
+  -- Los datos del garante, ya normalizados (el tipo t_garante está al
+  -- principio del body). Una referencia común los deja todos NULL aunque el
+  -- cliente los mande; CONCEPTOS solo va si POSEE_OTROS_INGRESOS = 'S'. Los
+  -- rangos se validan acá para dar un mensaje legible en vez de ORA-01438
+  -- (ANTIGUEDAD_ANIOS es NUMBER(3,0)).
+  FUNCTION datos_garante(
+    p_ind_garante          VARCHAR2,
+    p_es_empleado          VARCHAR2,
+    p_antiguedad_anios     NUMBER,
+    p_cod_profesion        NUMBER,
+    p_empresa_nombre       VARCHAR2,
+    p_empresa_telefono     VARCHAR2,
+    p_empresa_ciudad       VARCHAR2,
+    p_empresa_calle_nro    VARCHAR2,
+    p_puesto               VARCHAR2,
+    p_ingresos_mensuales   NUMBER,
+    p_posee_otros_ingresos VARCHAR2,
+    p_conceptos            VARCHAR2,
+    p_aporta_ips           VARCHAR2
+  ) RETURN t_garante IS
+    g t_garante;
+  BEGIN
+    IF p_ind_garante <> 'S' THEN
+      RETURN g;
+    END IF;
+
+    IF p_antiguedad_anios IS NOT NULL
+       AND (p_antiguedad_anios < 0 OR p_antiguedad_anios > 99
+            OR p_antiguedad_anios <> TRUNC(p_antiguedad_anios)) THEN
+      RAISE_APPLICATION_ERROR(-20401, 'La antigüedad del garante va en años enteros, de 0 a 99');
+    END IF;
+    IF p_ingresos_mensuales IS NOT NULL AND p_ingresos_mensuales < 0 THEN
+      RAISE_APPLICATION_ERROR(-20402, 'Los ingresos mensuales del garante no pueden ser negativos');
+    END IF;
+
+    g.es_empleado          := norm_sn(p_es_empleado);
+    g.antiguedad_anios     := p_antiguedad_anios;
+    g.cod_profesion        := p_cod_profesion;
+    g.empresa_nombre       := TRIM(p_empresa_nombre);
+    g.empresa_telefono     := TRIM(p_empresa_telefono);
+    g.empresa_ciudad       := TRIM(p_empresa_ciudad);
+    g.empresa_calle_nro    := TRIM(p_empresa_calle_nro);
+    g.puesto               := TRIM(p_puesto);
+    g.ingresos_mensuales   := p_ingresos_mensuales;
+    g.posee_otros_ingresos := norm_sn(p_posee_otros_ingresos);
+    g.conceptos            := CASE WHEN g.posee_otros_ingresos = 'S' THEN TRIM(p_conceptos) END;
+    g.aporta_ips           := norm_sn(p_aporta_ips);
+    RETURN g;
+  END datos_garante;
+
   FUNCTION ins_referencia(
-    p_id              NUMBER,
-    p_relacion        VARCHAR2,
-    p_telefono        VARCHAR2,
-    p_nombre_apellido VARCHAR2,
-    p_ind_garante     VARCHAR2 DEFAULT 'N'
+    p_id                   NUMBER,
+    p_relacion             VARCHAR2,
+    p_telefono             VARCHAR2,
+    p_nombre_apellido      VARCHAR2,
+    p_ind_garante          VARCHAR2 DEFAULT 'N',
+    p_nro_documento        VARCHAR2 DEFAULT NULL,
+    p_es_empleado          VARCHAR2 DEFAULT NULL,
+    p_antiguedad_anios     NUMBER   DEFAULT NULL,
+    p_cod_profesion        NUMBER   DEFAULT NULL,
+    p_empresa_nombre       VARCHAR2 DEFAULT NULL,
+    p_empresa_telefono     VARCHAR2 DEFAULT NULL,
+    p_empresa_ciudad       VARCHAR2 DEFAULT NULL,
+    p_empresa_calle_nro    VARCHAR2 DEFAULT NULL,
+    p_puesto               VARCHAR2 DEFAULT NULL,
+    p_ingresos_mensuales   NUMBER   DEFAULT NULL,
+    p_posee_otros_ingresos VARCHAR2 DEFAULT NULL,
+    p_conceptos            VARCHAR2 DEFAULT NULL,
+    p_aporta_ips           VARCHAR2 DEFAULT NULL
   ) RETURN NUMBER IS
     l_id_detalle NUMBER;
-    -- norm_garante es privada del body: no se puede llamar dentro del SQL
-    -- (PLS-00231), así que se resuelve antes en una variable.
+    -- norm_garante y datos_garante son privadas del body: no se pueden llamar
+    -- dentro del SQL (PLS-00231), así que se resuelven antes en variables.
     l_garante    VARCHAR2(1) := norm_garante(p_ind_garante);
+    g            t_garante   := datos_garante(
+                                  l_garante, p_es_empleado, p_antiguedad_anios, p_cod_profesion,
+                                  p_empresa_nombre, p_empresa_telefono, p_empresa_ciudad,
+                                  p_empresa_calle_nro, p_puesto, p_ingresos_mensuales,
+                                  p_posee_otros_ingresos, p_conceptos, p_aporta_ips);
   BEGIN
-    INSERT INTO solicitud_ventas_referencias (id, relacion, telefono, nombre_apellido, ind_garante)
-    VALUES (p_id, p_relacion, p_telefono, p_nombre_apellido, l_garante)
-    RETURNING id_detalle INTO l_id_detalle;
+    INSERT INTO solicitud_ventas_referencias (
+      id, relacion, telefono, nombre_apellido, ind_garante, nro_documento,
+      es_empleado, antiguedad_anios, cod_profesion, empresa_nombre, empresa_telefono,
+      empresa_ciudad, empresa_calle_nro, puesto, ingresos_mensuales,
+      posee_otros_ingresos, conceptos, aporta_ips
+    ) VALUES (
+      p_id, p_relacion, p_telefono, p_nombre_apellido, l_garante, TRIM(p_nro_documento),
+      g.es_empleado, g.antiguedad_anios, g.cod_profesion, g.empresa_nombre, g.empresa_telefono,
+      g.empresa_ciudad, g.empresa_calle_nro, g.puesto, g.ingresos_mensuales,
+      g.posee_otros_ingresos, g.conceptos, g.aporta_ips
+    ) RETURNING id_detalle INTO l_id_detalle;
     COMMIT;
     RETURN l_id_detalle;
   END ins_referencia;
 
   PROCEDURE upd_referencia(
-    p_id_detalle      NUMBER,
-    p_relacion        VARCHAR2,
-    p_telefono        VARCHAR2,
-    p_nombre_apellido VARCHAR2,
-    p_ind_garante     VARCHAR2 DEFAULT 'N'
+    p_id_detalle           NUMBER,
+    p_relacion             VARCHAR2,
+    p_telefono             VARCHAR2,
+    p_nombre_apellido      VARCHAR2,
+    p_ind_garante          VARCHAR2 DEFAULT 'N',
+    p_nro_documento        VARCHAR2 DEFAULT NULL,
+    p_es_empleado          VARCHAR2 DEFAULT NULL,
+    p_antiguedad_anios     NUMBER   DEFAULT NULL,
+    p_cod_profesion        NUMBER   DEFAULT NULL,
+    p_empresa_nombre       VARCHAR2 DEFAULT NULL,
+    p_empresa_telefono     VARCHAR2 DEFAULT NULL,
+    p_empresa_ciudad       VARCHAR2 DEFAULT NULL,
+    p_empresa_calle_nro    VARCHAR2 DEFAULT NULL,
+    p_puesto               VARCHAR2 DEFAULT NULL,
+    p_ingresos_mensuales   NUMBER   DEFAULT NULL,
+    p_posee_otros_ingresos VARCHAR2 DEFAULT NULL,
+    p_conceptos            VARCHAR2 DEFAULT NULL,
+    p_aporta_ips           VARCHAR2 DEFAULT NULL
   ) IS
     l_garante VARCHAR2(1) := norm_garante(p_ind_garante);
+    g         t_garante   := datos_garante(
+                               l_garante, p_es_empleado, p_antiguedad_anios, p_cod_profesion,
+                               p_empresa_nombre, p_empresa_telefono, p_empresa_ciudad,
+                               p_empresa_calle_nro, p_puesto, p_ingresos_mensuales,
+                               p_posee_otros_ingresos, p_conceptos, p_aporta_ips);
   BEGIN
+    -- Si deja de ser garante, sus datos laborales se borran (g viene vacío).
     UPDATE solicitud_ventas_referencias SET
-      relacion        = p_relacion,
-      telefono        = p_telefono,
-      nombre_apellido = p_nombre_apellido,
-      ind_garante     = l_garante
+      relacion             = p_relacion,
+      telefono             = p_telefono,
+      nombre_apellido      = p_nombre_apellido,
+      ind_garante          = l_garante,
+      nro_documento        = TRIM(p_nro_documento),
+      es_empleado          = g.es_empleado,
+      antiguedad_anios     = g.antiguedad_anios,
+      cod_profesion        = g.cod_profesion,
+      empresa_nombre       = g.empresa_nombre,
+      empresa_telefono     = g.empresa_telefono,
+      empresa_ciudad       = g.empresa_ciudad,
+      empresa_calle_nro    = g.empresa_calle_nro,
+      puesto               = g.puesto,
+      ingresos_mensuales   = g.ingresos_mensuales,
+      posee_otros_ingresos = g.posee_otros_ingresos,
+      conceptos            = g.conceptos,
+      aporta_ips           = g.aporta_ips
     WHERE id_detalle = p_id_detalle;
     COMMIT;
   END upd_referencia;
@@ -368,6 +686,42 @@ CREATE OR REPLACE PACKAGE BODY pkg_solicitud_ventas AS
     DELETE FROM solicitud_ventas_actividad_laboral WHERE id_detalle = p_id_detalle;
     COMMIT;
   END del_actividad;
+
+  --------------------------------------------------------------- PROFESIONES
+  -- Misma validación que pkg_definiciones.profesion_validar (copiada, ver la
+  -- spec): si cambia una regla allá, cambiarla acá también.
+  FUNCTION ins_profesion(p_descripcion VARCHAR2) RETURN NUMBER IS
+    l_desc VARCHAR2(4000) := TRIM(REGEXP_REPLACE(p_descripcion, '\s+', ' '));
+    l_otro NUMBER;
+    l_cod  NUMBER;
+  BEGIN
+    IF l_desc IS NULL THEN
+      RAISE_APPLICATION_ERROR(-20411, 'Falta la descripción de la profesión');
+    END IF;
+    IF LENGTH(l_desc) > 200 THEN
+      RAISE_APPLICATION_ERROR(-20412, 'La profesión admite hasta 200 caracteres');
+    END IF;
+
+    SELECT MIN(cod_profesion) INTO l_otro
+      FROM profesiones
+     WHERE UPPER(TRIM(REGEXP_REPLACE(descripcion, '\s+', ' '))) = UPPER(l_desc);
+    IF l_otro IS NOT NULL THEN
+      RAISE_APPLICATION_ERROR(-20413,
+        'Ya existe la profesión ' || l_desc || ': buscala en la lista');
+    END IF;
+
+    -- COD_PROFESION en NULL: lo pone BI_PROFESIONES con la secuencia.
+    INSERT INTO profesiones (cod_profesion, descripcion)
+    VALUES (NULL, l_desc)
+    RETURNING cod_profesion INTO l_cod;
+
+    COMMIT;
+    RETURN l_cod;
+  EXCEPTION
+    WHEN OTHERS THEN
+      ROLLBACK;
+      RAISE;
+  END ins_profesion;
 
 END pkg_solicitud_ventas;
 /
@@ -649,7 +1003,9 @@ END;');
       p_etag_query     => NULL,
       p_comments       => NULL);
 
-  -- SELECT * ya incluye IND_GARANTE; el frontend lo lee como ind_garante.
+  -- SELECT * ya incluye IND_GARANTE y las columnas del 2026-10-19 (cédula y
+  -- datos del garante); el frontend las lee en minúscula. La profesión del
+  -- garante se resuelve en el cliente con lovLabels("profesiones").
   ORDS.DEFINE_HANDLER(
       p_module_name    => 'solicitudes',
       p_pattern        => 'referencias/:id',
@@ -674,7 +1030,14 @@ END;');
         l_idd := pkg_solicitud_ventas.ins_referencia(
           p_id => :id, p_relacion => :relacion,
           p_telefono => :telefono, p_nombre_apellido => :nombre_apellido,
-          p_ind_garante => :ind_garante);
+          p_ind_garante => :ind_garante, p_nro_documento => :nro_documento,
+          p_es_empleado => :es_empleado, p_antiguedad_anios => :antiguedad_anios,
+          p_cod_profesion => :cod_profesion, p_empresa_nombre => :empresa_nombre,
+          p_empresa_telefono => :empresa_telefono, p_empresa_ciudad => :empresa_ciudad,
+          p_empresa_calle_nro => :empresa_calle_nro, p_puesto => :puesto,
+          p_ingresos_mensuales => :ingresos_mensuales,
+          p_posee_otros_ingresos => :posee_otros_ingresos,
+          p_conceptos => :conceptos, p_aporta_ips => :aporta_ips);
         :status_code := 201;
         htp.p(''{"success": true, "id_detalle": '' || l_idd || ''}'');
       EXCEPTION WHEN OTHERS THEN
@@ -704,7 +1067,14 @@ END;');
         pkg_solicitud_ventas.upd_referencia(
           p_id_detalle => :id_detalle, p_relacion => :relacion,
           p_telefono => :telefono, p_nombre_apellido => :nombre_apellido,
-          p_ind_garante => :ind_garante);
+          p_ind_garante => :ind_garante, p_nro_documento => :nro_documento,
+          p_es_empleado => :es_empleado, p_antiguedad_anios => :antiguedad_anios,
+          p_cod_profesion => :cod_profesion, p_empresa_nombre => :empresa_nombre,
+          p_empresa_telefono => :empresa_telefono, p_empresa_ciudad => :empresa_ciudad,
+          p_empresa_calle_nro => :empresa_calle_nro, p_puesto => :puesto,
+          p_ingresos_mensuales => :ingresos_mensuales,
+          p_posee_otros_ingresos => :posee_otros_ingresos,
+          p_conceptos => :conceptos, p_aporta_ips => :aporta_ips);
         :status_code := 200;
         htp.p(''{"success": true}'');
       EXCEPTION WHEN OTHERS THEN
@@ -954,6 +1324,65 @@ END;');
       FROM   profesiones
       ORDER BY descripcion
     ');
+
+  -- Alta de profesión desde el wizard (2026-10-19). Cualquier asesor con token
+  -- válido; las reglas están en pkg_solicitud_ventas.ins_profesion. Devuelve
+  -- la fila como la da el LOV ({value, label}) para que el wizard la deje
+  -- elegida sin volver a pedir la lista.
+  ORDS.DEFINE_TEMPLATE(
+      p_module_name    => 'solicitudes',
+      p_pattern        => 'profesiones',
+      p_priority       => 0,
+      p_etag_type      => 'NONE',
+      p_etag_query     => NULL,
+      p_comments       => NULL);
+
+  ORDS.DEFINE_HANDLER(
+      p_module_name    => 'solicitudes',
+      p_pattern        => 'profesiones',
+      p_method         => 'POST',
+      p_source_type    => 'plsql/block',
+      p_mimes_allowed  => NULL,
+      p_comments       => NULL,
+      p_source         =>
+'
+      DECLARE
+        l_user VARCHAR2(255);
+        l_cod  NUMBER;
+        l_desc VARCHAR2(200);
+      BEGIN
+        l_user := pkg_auth_token.validar_token(REPLACE(:authorization, ''Bearer '', ''''));
+        IF l_user IS NULL THEN
+          :status_code := 401;
+          htp.p(''{"success": false, "message": "Token invalido o expirado"}'');
+          RETURN;
+        END IF;
+
+        l_cod := pkg_solicitud_ventas.ins_profesion(:descripcion);
+        SELECT descripcion INTO l_desc FROM profesiones WHERE cod_profesion = l_cod;
+
+        :status_code := 201;
+        apex_json.open_object;
+        apex_json.write(''success'', TRUE);
+        apex_json.write(''value'',   l_cod);
+        apex_json.write(''label'',   l_desc);
+        apex_json.close_object;
+      EXCEPTION WHEN OTHERS THEN
+        :status_code := 400;
+        htp.p(''{"success": false, "message": '' || apex_json.stringify(SQLERRM) || ''}'');
+      END;
+    ');
+
+  ORDS.DEFINE_PARAMETER(
+      p_module_name        => 'solicitudes',
+      p_pattern            => 'profesiones',
+      p_method             => 'POST',
+      p_name               => 'authorization',
+      p_bind_variable_name => 'authorization',
+      p_source_type        => 'HEADER',
+      p_param_type         => 'STRING',
+      p_access_method      => 'IN',
+      p_comments           => NULL);
 
   ORDS.DEFINE_TEMPLATE(
       p_module_name    => 'solicitudes',

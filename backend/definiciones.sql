@@ -31,6 +31,8 @@
 --   VENTAS_ACTIVIDAD_LABORAL tiene FK (Oracle daría ORA-02292), pero
 --   SOLICITUD_VENTAS_ACTIVIDAD_LABORAL no, y sin este control el borrado
 --   dejaría solicitudes apuntando a un código que ya no existe.
+--   Desde el 2026-10-19 también cuenta los garantes de
+--   SOLICITUD_VENTAS_REFERENCIAS y VENTAS_REFERENCIAS (esas sí tienen FK).
 --
 -- · El LOV del asesor (GET /solicitudes/lov/profesiones) lee la misma tabla:
 --   un alta, edición o baja acá se ve en el wizard de solicitud al instante.
@@ -68,6 +70,8 @@
 --
 --   FK que apuntan a PROFESIONES_PK:
 --     VENTAS_ACTIVIDAD_LABORAL.VENTAS_ACTIVIDAD_LABORAL_FK_PROFESION  NO ACTION
+--     SOLICITUD_VENTAS_REFERENCIAS.SOLICITUD_VENTAS_REF_PROF_FK       NO ACTION (2026-10-19)
+--     VENTAS_REFERENCIAS.VENTAS_REFERENCIAS_FK_PROF                   NO ACTION (2026-10-19)
 --   SOLICITUD_VENTAS_ACTIVIDAD_LABORAL.COD_PROFESION no tiene FK.
 --
 -- Antes de usar la pantalla conviene mirar si ya hay duplicados, porque a
@@ -231,14 +235,25 @@ CREATE OR REPLACE PACKAGE BODY pkg_definiciones AS
     END;
 
     -- SOLICITUD_VENTAS_ACTIVIDAD_LABORAL no tiene FK: si no se cuenta acá,
-    -- el DELETE pasa y deja solicitudes huérfanas.
-    SELECT COUNT(*) INTO l_solicitudes
-      FROM solicitud_ventas_actividad_laboral
-     WHERE cod_profesion = p_cod_profesion;
+    -- el DELETE pasa y deja solicitudes huérfanas. Los garantes
+    -- (SOLICITUD_VENTAS_REFERENCIAS, 2026-10-19) sí tienen FK, pero se
+    -- cuentan igual para dar el mensaje de abajo y no un ORA-02292. Se
+    -- cuentan solicitudes distintas: una puede usarla en los dos lados.
+    SELECT COUNT(DISTINCT id) INTO l_solicitudes
+      FROM ( SELECT id FROM solicitud_ventas_actividad_laboral
+              WHERE cod_profesion = p_cod_profesion
+             UNION ALL
+             SELECT id FROM solicitud_ventas_referencias
+              WHERE cod_profesion = p_cod_profesion );
 
-    SELECT COUNT(*) INTO l_creditos
-      FROM ventas_actividad_laboral
-     WHERE cod_profesion = p_cod_profesion;
+    -- Los garantes de VENTAS_REFERENCIAS (2026-10-19) también, por el mismo
+    -- motivo que en las solicitudes: créditos distintos, no filas.
+    SELECT COUNT(DISTINCT id) INTO l_creditos
+      FROM ( SELECT id FROM ventas_actividad_laboral
+              WHERE cod_profesion = p_cod_profesion
+             UNION ALL
+             SELECT id FROM ventas_referencias
+              WHERE cod_profesion = p_cod_profesion );
 
     IF l_solicitudes + l_creditos > 0 THEN
       RAISE_APPLICATION_ERROR(-20606,

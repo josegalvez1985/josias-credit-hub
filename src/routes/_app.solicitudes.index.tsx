@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Search, FilePlus, FileText, Loader2, AlertCircle, RefreshCw } from "lucide-react";
-import { listarCabeceras, nombresClientes, type Cabecera } from "@/lib/api";
+import { listarCabeceras, nombresClientes, veTodasLasSolicitudes, type Cabecera } from "@/lib/api";
 import { formatCurrency } from "@/lib/credit-applications";
 import { fechaLocal } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,8 @@ function ApplicationsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  // JOSEG ve las de todos los asesores: se muestra de quién es cada una.
+  const todas = veTodasLasSolicitudes();
 
   function load() {
     if (!API_URL) {
@@ -75,7 +77,7 @@ function ApplicationsList() {
         <div>
           <h1 className="font-display text-3xl font-semibold">Solicitudes</h1>
           <p className="text-sm text-muted-foreground">
-            {loading ? "Cargando..." : `${items.length} en total`}
+            {loading ? "Cargando..." : `${items.length} en total${todas ? " · de todos los asesores" : ""}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -156,6 +158,12 @@ function ApplicationsList() {
                         <span>{a.cantidad_cuotas} cuotas</span>
                         <span aria-hidden>·</span>
                         <span>{formatCurrency(a.monto_cuota)}/mes</span>
+                        {todas && a.cod_usuario && (
+                          <>
+                            <span aria-hidden>·</span>
+                            <span>Asesor {a.cod_usuario}</span>
+                          </>
+                        )}
                         {a.fecha_factura && (
                           <>
                             <span aria-hidden>·</span>

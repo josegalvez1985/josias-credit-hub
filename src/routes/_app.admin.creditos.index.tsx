@@ -11,13 +11,14 @@ import {
   Search,
 } from "lucide-react";
 import {
+  listarCreditoReferencias,
   listarCreditos,
   obtenerCredito,
   obtenerCreditoCompleto,
   type CreditoRow,
 } from "@/lib/api";
 import { imprimirSolicitud } from "@/lib/impresion-solicitud";
-import { imprimirPagare } from "@/lib/impresion-pagare";
+import { codeudorDe, imprimirPagare } from "@/lib/impresion-pagare";
 import { formatCurrency } from "@/lib/credit-applications";
 import { AdminHeader } from "./_app.admin";
 import { toast } from "sonner";
@@ -130,12 +131,18 @@ function CreditosPage() {
     }
   }
 
-  // El pagaré solo necesita la cabecera (monto, monto en letras, % interés y
-  // datos del titular), así que se pide sola en vez del crédito completo.
+  // El pagaré necesita la cabecera (monto, monto en letras, % interés y datos
+  // del titular) y las referencias, para el codeudor (codeudorDe). Se piden
+  // esas dos en vez del crédito completo. Si las referencias fallan, sale con
+  // el codeudor en blanco, como antes del 2026-10-19.
   async function pagare(id: number) {
     setImprimiendo({ id, doc: "pag" });
     try {
-      imprimirPagare(await obtenerCredito(id));
+      const [cab, refs] = await Promise.all([
+        obtenerCredito(id),
+        listarCreditoReferencias(id).catch(() => []),
+      ]);
+      imprimirPagare(cab, codeudorDe(refs));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo abrir el pagaré");
     } finally {

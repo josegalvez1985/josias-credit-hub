@@ -11,9 +11,9 @@ import {
   Users,
   AlertCircle,
 } from "lucide-react";
-import { obtenerCreditoCompleto, type CreditoCompleto } from "@/lib/api";
+import { obtenerCreditoCompleto, type CreditoCompleto, type CreditoReferencia } from "@/lib/api";
 import { imprimirSolicitud } from "@/lib/impresion-solicitud";
-import { imprimirPagare } from "@/lib/impresion-pagare";
+import { codeudorDe, imprimirPagare } from "@/lib/impresion-pagare";
 import { formatCurrency } from "@/lib/credit-applications";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -92,11 +92,12 @@ function CreditoDetallePage() {
     }
   }
 
-  // El pagaré sale solo de la cabecera: monto, monto en letras, % de interés y
-  // los datos del titular. No necesita los bloques hijos.
+  // El pagaré sale de la cabecera (monto, monto en letras, % de interés y los
+  // datos del titular) y, desde el 2026-10-19, del garante como codeudor si
+  // hay uno solo (codeudorDe).
   function imprimirElPagare() {
     try {
-      imprimirPagare(c);
+      imprimirPagare(c, codeudorDe(referencias));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo abrir el pagaré");
     }
@@ -250,6 +251,7 @@ function CreditoDetallePage() {
               <TableHeader>
                 <TableRow className="bg-muted/60 hover:bg-muted/60">
                   <TableHead>Nombre y apellido</TableHead>
+                  <TableHead>Cédula</TableHead>
                   <TableHead>Relación</TableHead>
                   <TableHead>Teléfono</TableHead>
                   <TableHead>Garante</TableHead>
@@ -261,6 +263,7 @@ function CreditoDetallePage() {
                     <TableCell className="max-w-[20rem] truncate font-medium">
                       {r.nombre_apellido || "—"}
                     </TableCell>
+                    <TableCell className="whitespace-nowrap">{r.nro_documento || "—"}</TableCell>
                     <TableCell>{r.relacion_desc || "—"}</TableCell>
                     <TableCell>{r.telefono || "—"}</TableCell>
                     <TableCell>
@@ -278,6 +281,43 @@ function CreditoDetallePage() {
             </Table>
           </div>
         )}
+
+        {/* Datos laborales de cada garante (2026-10-19). Los créditos
+            aprobados antes no los tienen: ese garante no se dibuja. */}
+        {referencias.filter(tieneDatosGarante).map((r) => (
+          <div key={`g-${r.id_detalle}`} className="space-y-3 rounded-xl border border-border p-4">
+            <p className="text-sm font-semibold">
+              Garante · {r.nombre_apellido || "—"}
+              {r.nro_documento && (
+                <span className="ml-2 font-normal text-muted-foreground">CI {r.nro_documento}</span>
+              )}
+            </p>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Row
+                label="Situación"
+                value={r.es_empleado === "S" ? "Empleado" : r.es_empleado === "N" ? "Independiente" : undefined}
+              />
+              <Row label="Empresa" value={r.empresa_nombre} />
+              <Row label="Puesto" value={r.puesto} />
+              <Row label="Profesión" value={r.profesion} />
+              <Row
+                label="Antigüedad"
+                value={
+                  r.antiguedad_anios != null
+                    ? `${r.antiguedad_anios} ${r.antiguedad_anios === 1 ? "año" : "años"}`
+                    : undefined
+                }
+              />
+              <Row label="Ingresos mensuales" value={money(r.ingresos_mensuales)} />
+              <Row label="Teléfono empresa" value={r.empresa_telefono} />
+              <Row label="Ciudad empresa" value={r.empresa_ciudad} />
+              <Row label="Calle y número" value={r.empresa_calle_nro} />
+              <Row label="Aporta IPS" value={sino(r.aporta_ips ?? undefined)} />
+              <Row label="Otros ingresos" value={sino(r.posee_otros_ingresos ?? undefined)} />
+              {r.posee_otros_ingresos === "S" && <Row label="Conceptos" value={r.conceptos} />}
+            </div>
+          </div>
+        ))}
       </Card>
 
       {/* Plan de cuotas. No está en la página 18 de APEX: lo generan los
@@ -378,6 +418,24 @@ function Row({ label, value }: { label: string; value?: string | number | null }
       <span className="min-w-0 truncate text-right text-sm font-medium">{value || "—"}</span>
     </div>
   );
+}
+
+// Garante con al menos un dato laboral cargado.
+function tieneDatosGarante(r: CreditoReferencia): boolean {
+  if (r.ind_garante !== "S") return false;
+  return [
+    r.es_empleado,
+    r.antiguedad_anios,
+    r.cod_profesion,
+    r.empresa_nombre,
+    r.empresa_telefono,
+    r.empresa_ciudad,
+    r.empresa_calle_nro,
+    r.puesto,
+    r.ingresos_mensuales,
+    r.posee_otros_ingresos,
+    r.aporta_ips,
+  ].some((v) => v != null && v !== "");
 }
 
 function Vacio({ texto }: { texto: string }) {

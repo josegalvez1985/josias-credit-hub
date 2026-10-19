@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronsUpDown, Loader2, Search } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,12 @@ type Props = {
   fetcher: (q?: string) => Promise<LovItem[]>;
   onSelect: (item: LovItem) => void;
   renderItem?: (item: LovItem) => React.ReactNode;
+  // Opcional: permite dar de alta lo que se escribió en el buscador cuando no
+  // está en la lista (ej. una profesión nueva). Recibe el texto y devuelve la
+  // fila creada, que queda elegida. Si falla, el error se muestra en el
+  // diálogo y no se cierra.
+  onCreate?: (texto: string) => Promise<LovItem>;
+  createLabel?: string; // "Crear profesión"
 };
 
 export function AsyncCombobox({
@@ -31,12 +37,39 @@ export function AsyncCombobox({
   fetcher,
   onSelect,
   renderItem,
+  onCreate,
+  createLabel = "Crear",
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<LovItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [creando, setCreando] = useState(false);
+  const [errorAlta, setErrorAlta] = useState<string | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Se ofrece crear solo si hay texto y ninguna fila se llama exactamente así
+  // (sin distinguir mayúsculas ni espacios de más, como compara Oracle).
+  const texto = query.trim().replace(/\s+/g, " ");
+  const yaExiste = items.some(
+    (i) => i.label.trim().replace(/\s+/g, " ").toLowerCase() === texto.toLowerCase(),
+  );
+  const puedeCrear = !!onCreate && !!texto && !loading && !yaExiste;
+
+  async function crear() {
+    if (!onCreate || !texto) return;
+    setCreando(true);
+    setErrorAlta(null);
+    try {
+      const item = await onCreate(texto);
+      onSelect(item);
+      setOpen(false);
+    } catch (e) {
+      setErrorAlta(e instanceof Error ? e.message : "No se pudo crear");
+    } finally {
+      setCreando(false);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -53,7 +86,10 @@ export function AsyncCombobox({
 
   useEffect(() => {
     if (!open) setQuery("");
+    setErrorAlta(null);
   }, [open]);
+
+  useEffect(() => setErrorAlta(null), [query]);
 
   return (
     <>
@@ -116,6 +152,26 @@ export function AsyncCombobox({
               </ul>
             )}
           </div>
+
+          {onCreate && (puedeCrear || errorAlta) && (
+            <div className="space-y-2 border-t border-border px-4 py-3">
+              {errorAlta && <p className="text-xs text-destructive">{errorAlta}</p>}
+              {puedeCrear && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={crear}
+                  disabled={creando}
+                  className="w-full justify-start"
+                >
+                  {creando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  <span className="min-w-0 truncate">
+                    {createLabel} «{texto}»
+                  </span>
+                </Button>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>

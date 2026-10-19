@@ -17,10 +17,12 @@ import {
 import { formatCurrency } from "@/lib/credit-applications";
 import {
   crearSolicitud,
+  crearProfesionDesdeSolicitud,
   listarPrecios,
   lov,
   type DetalleInput,
   type ReferenciaInput,
+  type DatosGarante,
   type ActividadInput,
   type LovItem,
   type PrecioVenta,
@@ -147,16 +149,37 @@ function NewApplication() {
   const [actProfesion, setActProfesion] = useState<{ value: number; label: string } | null>(null);
   const [actCiudad, setActCiudad] = useState<{ value: number; label: string } | null>(null);
 
-  // ---- Referencias (guardamos el label de la relación solo para mostrar en la lista)
-  type RefRow = ReferenciaInput & { relacionLabel: string };
-  const [referencias, setReferencias] = useState<RefRow[]>([]);
-  const [refRow, setRefRow] = useState<RefRow>({
+  // ---- Referencias (guardamos los labels de relación y profesión solo para mostrar en la lista)
+  type RefRow = ReferenciaInput & { relacionLabel: string; profesionLabel: string };
+  const REF_VACIA: RefRow = {
     relacion: 0,
     relacionLabel: "",
+    profesionLabel: "",
     telefono: "",
     nombre_apellido: "",
     ind_garante: "N",
-  });
+    nro_documento: "",
+  };
+  const [referencias, setReferencias] = useState<RefRow[]>([]);
+  const [refRow, setRefRow] = useState<RefRow>(REF_VACIA);
+
+  // Datos laborales del garante: solo se ven y se mandan si "¿Es garante?"
+  // está prendido. Todos opcionales; los números van como dígitos.
+  const GAR_VACIO = {
+    es_empleado: "" as "" | "S" | "N",
+    empresa_nombre: "",
+    puesto: "",
+    empresa_telefono: "",
+    empresa_ciudad: "",
+    empresa_calle_nro: "",
+    antiguedad_anios: "",
+    ingresos_mensuales: "",
+    posee_otros_ingresos: "N",
+    conceptos: "",
+    aporta_ips: "N",
+  };
+  const [gar, setGar] = useState(GAR_VACIO);
+  const [garProfesion, setGarProfesion] = useState<{ value: number; label: string } | null>(null);
 
   // ---- Cálculos
   const cuotas = Number(cantidadCuotas) || 1;
@@ -268,8 +291,52 @@ function NewApplication() {
     if (!refRow.nombre_apellido.trim() || !refRow.telefono.trim()) {
       return toast.error("Nombre y teléfono son obligatorios");
     }
-    setReferencias((r) => [...r, refRow]);
-    setRefRow({ relacion: 0, relacionLabel: "", telefono: "", nombre_apellido: "", ind_garante: "N" });
+    const txt = (s?: string | null) => s?.trim() || null;
+    const num = (s: string) => (s === "" ? null : Number(s));
+    // Una referencia común no lleva datos del garante: van null (el paquete
+    // igual los descarta).
+    const datos: DatosGarante =
+      refRow.ind_garante === "S"
+        ? {
+            es_empleado: gar.es_empleado || null,
+            antiguedad_anios: num(gar.antiguedad_anios),
+            cod_profesion: garProfesion?.value ?? null,
+            empresa_nombre: txt(gar.empresa_nombre),
+            empresa_telefono: txt(gar.empresa_telefono),
+            empresa_ciudad: txt(gar.empresa_ciudad),
+            empresa_calle_nro: txt(gar.empresa_calle_nro),
+            puesto: txt(gar.puesto),
+            ingresos_mensuales: num(gar.ingresos_mensuales),
+            posee_otros_ingresos: gar.posee_otros_ingresos,
+            conceptos: gar.posee_otros_ingresos === "S" ? txt(gar.conceptos) : null,
+            aporta_ips: gar.aporta_ips,
+          }
+        : {
+            es_empleado: null,
+            antiguedad_anios: null,
+            cod_profesion: null,
+            empresa_nombre: null,
+            empresa_telefono: null,
+            empresa_ciudad: null,
+            empresa_calle_nro: null,
+            puesto: null,
+            ingresos_mensuales: null,
+            posee_otros_ingresos: null,
+            conceptos: null,
+            aporta_ips: null,
+          };
+    setReferencias((r) => [
+      ...r,
+      {
+        ...refRow,
+        nro_documento: txt(refRow.nro_documento),
+        ...datos,
+        profesionLabel: refRow.ind_garante === "S" ? (garProfesion?.label ?? "") : "",
+      },
+    ]);
+    setRefRow(REF_VACIA);
+    setGar(GAR_VACIO);
+    setGarProfesion(null);
   }
 
   function addActividad() {
@@ -342,7 +409,7 @@ function NewApplication() {
           ...d,
           precio_unitario: d.cantidad > 0 ? Math.round(total_linea / d.cantidad) : 0,
         })),
-        referencias: referencias.map(({ relacionLabel: _rl, ...r }) => r),
+        referencias: referencias.map(({ relacionLabel: _rl, profesionLabel: _pl, ...r }) => r),
         actividades: actividades.map(({ profesionLabel: _pl, ciudadLabel: _cl, ...a }) => a),
       });
       toast.success(`Solicitud #${id} registrada`);
@@ -669,6 +736,8 @@ function NewApplication() {
                     value={actProfesion?.value ?? null}
                     label={actProfesion?.label ?? null}
                     fetcher={lov.profesiones}
+                    onCreate={crearProfesionDesdeSolicitud}
+                    createLabel="Crear profesión"
                     onSelect={(it) => setActProfesion({ value: it.value, label: it.label })}
                   />
                 </Field>
@@ -737,6 +806,14 @@ function NewApplication() {
                 <Field label="Teléfono">
                   <Input type="tel" value={refRow.telefono} onChange={(e) => setRefRow((r) => ({ ...r, telefono: e.target.value }))} />
                 </Field>
+                <Field label="Cédula (CI)">
+                  <Input
+                    inputMode="numeric"
+                    maxLength={20}
+                    value={refRow.nro_documento ?? ""}
+                    onChange={(e) => setRefRow((r) => ({ ...r, nro_documento: e.target.value }))}
+                  />
+                </Field>
                 <Field label="Relación">
                   <AsyncCombobox
                     title="Relación"
@@ -756,6 +833,108 @@ function NewApplication() {
                   onCheckedChange={(v) => setRefRow((r) => ({ ...r, ind_garante: v ? "S" : "N" }))}
                 />
               </div>
+
+              {refRow.ind_garante === "S" && (
+                <div className="mt-3 space-y-4 rounded-xl border border-border p-4">
+                  <div>
+                    <p className="font-medium">Datos laborales del garante</p>
+                    <p className="text-xs text-muted-foreground">Todos opcionales.</p>
+                  </div>
+
+                  {/* Tocar la opción elegida la desmarca: "sin dato" es válido. */}
+                  <div className="flex gap-2">
+                    {(["S", "N"] as const).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setGar((g) => ({ ...g, es_empleado: g.es_empleado === v ? "" : v }))}
+                        aria-pressed={gar.es_empleado === v}
+                        className={cn(
+                          "flex-1 rounded-xl border px-4 py-2.5 text-sm transition-colors",
+                          gar.es_empleado === v
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-border text-muted-foreground",
+                        )}
+                      >
+                        {v === "S" ? "Empleado" : "Independiente"}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Field label="Empresa / Negocio">
+                      <Input maxLength={200} value={gar.empresa_nombre} onChange={(e) => setGar((g) => ({ ...g, empresa_nombre: e.target.value }))} />
+                    </Field>
+                    <Field label="Puesto / Ocupación">
+                      <Input maxLength={200} value={gar.puesto} onChange={(e) => setGar((g) => ({ ...g, puesto: e.target.value }))} />
+                    </Field>
+                    <Field label="Teléfono de la empresa">
+                      <Input type="tel" maxLength={200} value={gar.empresa_telefono} onChange={(e) => setGar((g) => ({ ...g, empresa_telefono: e.target.value }))} />
+                    </Field>
+                    <Field label="Ciudad de la empresa">
+                      <Input maxLength={200} value={gar.empresa_ciudad} onChange={(e) => setGar((g) => ({ ...g, empresa_ciudad: e.target.value }))} />
+                    </Field>
+                    <Field label="Calle y número">
+                      <Input maxLength={200} value={gar.empresa_calle_nro} onChange={(e) => setGar((g) => ({ ...g, empresa_calle_nro: e.target.value }))} />
+                    </Field>
+                    <Field label="Antigüedad (años)">
+                      <Input
+                        inputMode="numeric"
+                        maxLength={2}
+                        value={gar.antiguedad_anios}
+                        onChange={(e) => setGar((g) => ({ ...g, antiguedad_anios: e.target.value.replace(/\D/g, "") }))}
+                      />
+                    </Field>
+                    <Field label="Ingresos mensuales">
+                      <Input
+                        inputMode="numeric"
+                        value={fmtMiles(gar.ingresos_mensuales)}
+                        onChange={(e) => setGar((g) => ({ ...g, ingresos_mensuales: e.target.value.replace(/\D/g, "") }))}
+                      />
+                    </Field>
+                    <Field label="Profesión">
+                      <AsyncCombobox
+                        title="Profesión"
+                        value={garProfesion?.value ?? null}
+                        label={garProfesion?.label ?? null}
+                        fetcher={lov.profesiones}
+                        onCreate={crearProfesionDesdeSolicitud}
+                        createLabel="Crear profesión"
+                        onSelect={(it) => setGarProfesion({ value: it.value, label: it.label })}
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="space-y-3 rounded-xl border border-border p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium">¿Posee otros ingresos?</p>
+                      <Switch
+                        checked={gar.posee_otros_ingresos === "S"}
+                        onCheckedChange={(v) => setGar((g) => ({ ...g, posee_otros_ingresos: v ? "S" : "N" }))}
+                      />
+                    </div>
+                    {gar.posee_otros_ingresos === "S" && (
+                      <Field label="Conceptos">
+                        <Textarea
+                          maxLength={400}
+                          rows={2}
+                          value={gar.conceptos}
+                          onChange={(e) => setGar((g) => ({ ...g, conceptos: e.target.value }))}
+                          placeholder="Ej: alquiler de un local, venta de ropa"
+                        />
+                      </Field>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-xl border border-border p-4">
+                    <p className="font-medium">¿Aporta a IPS?</p>
+                    <Switch
+                      checked={gar.aporta_ips === "S"}
+                      onCheckedChange={(v) => setGar((g) => ({ ...g, aporta_ips: v ? "S" : "N" }))}
+                    />
+                  </div>
+                </div>
+              )}
 
               <Button type="button" onClick={addReferencia} className="mt-3">
                 <Plus className="h-4 w-4" /> Agregar referencia
@@ -777,9 +956,18 @@ function NewApplication() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {r.relacionLabel && `${r.relacionLabel} · `}{r.telefono}
+                      <p className="truncate text-xs text-muted-foreground">
+                        {[r.relacionLabel, r.telefono, r.nro_documento && `CI ${r.nro_documento}`]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </p>
+                      {r.ind_garante === "S" && !!(r.empresa_nombre || r.profesionLabel || r.ingresos_mensuales) && (
+                        <p className="truncate text-xs text-muted-foreground">
+                          {[r.empresa_nombre, r.profesionLabel, r.ingresos_mensuales ? formatCurrency(r.ingresos_mensuales) : ""]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      )}
                     </div>
                     <button
                       type="button"

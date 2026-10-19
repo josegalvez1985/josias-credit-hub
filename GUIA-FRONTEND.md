@@ -335,6 +335,7 @@ documentos en hoja (logo, tabla con encabezado oscuro, `@page { margin: 0 }`,
 | --- | --- | --- |
 | Saldos de Proveedores | [reporte-saldos-proveedores.ts](src/lib/reporte-saldos-proveedores.ts) | Administración → Reportes |
 | Compras por Período | [reporte-compras.ts](src/lib/reporte-compras.ts) | Administración → Reportes |
+| Cheques a Vencer | [reporte-cheques.ts](src/lib/reporte-cheques.ts) | Administración → Reportes |
 
 Lo común (estilo, encabezado, pie, márgenes y la apertura de la pestaña) vive
 en [reporte-a4.ts](src/lib/reporte-a4.ts): un reporte nuevo arma su cuerpo y

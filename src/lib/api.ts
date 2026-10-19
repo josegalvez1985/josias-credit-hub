@@ -183,6 +183,26 @@ export type ReferenciaInput = {
   telefono: string;
   nombre_apellido: string;
   ind_garante: string; // 'S' | 'N' — CHK_VENTAS_REF_GARANTE_SOL solo acepta esos valores
+  nro_documento?: string | null; // cédula, de cualquier referencia (2026-10-19)
+} & Partial<DatosGarante>;
+
+// Datos laborales del garante (SOLICITUD_VENTAS_REFERENCIAS, 2026-10-19). Todos
+// opcionales. Solo se guardan si ind_garante = 'S': en una referencia común el
+// paquete los deja NULL aunque lleguen. La ciudad es texto libre (no COD_CIUDAD)
+// y no hay monto de otros ingresos, solo sus conceptos.
+export type DatosGarante = {
+  es_empleado: string | null; // 'S' | 'N' | null (sin dato)
+  antiguedad_anios: number | null; // años enteros, 0 a 99
+  cod_profesion: number | null;
+  empresa_nombre: string | null;
+  empresa_telefono: string | null;
+  empresa_ciudad: string | null;
+  empresa_calle_nro: string | null;
+  puesto: string | null;
+  ingresos_mensuales: number | null;
+  posee_otros_ingresos: string | null; // 'S' | 'N'
+  conceptos: string | null; // solo si posee_otros_ingresos = 'S'
+  aporta_ips: string | null; // 'S' | 'N'
 };
 
 export type ActividadInput = {
@@ -289,12 +309,55 @@ export function obtenerCliente(cod: number) {
 
 export type Cabecera = CabeceraInput & { id: number; estado?: string; cod_usuario?: string };
 
-// Solo devuelve las cabeceras del usuario logueado. Filtro client-side por
-// cod_usuario: el feed ORDS retorna esa columna y el login solo expone el username.
+// Alta de profesión desde el wizard (POST /solicitudes/profesiones). Cualquier
+// asesor puede; no es el ABM de Definiciones, que es solo de administradores.
+// Oracle limpia los espacios y rechaza una repetida sin distinguir mayúsculas.
+// Devuelve la fila como el LOV, lista para dejarla elegida.
+export async function crearProfesionDesdeSolicitud(descripcion: string): Promise<LovItem> {
+  try {
+    const r = await request<{ value: number; label: string }>("/solicitudes/profesiones", {
+      method: "POST",
+      body: JSON.stringify({ descripcion }),
+    });
+    return { value: r.value, label: r.label };
+  } catch (e) {
+    // "ORA-20413: Ya existe..." -> "Ya existe..."
+    throw new Error((e instanceof Error ? e.message : String(e)).replace(/^ORA-\d+:\s*/, ""));
+  }
+}
+
+// Usuarios que ven las solicitudes de TODOS los asesores, en MAYÚSCULAS como
+// las devuelve el login. Vive acá y no en permisos.ts porque permisos importa
+// auth, que importa este archivo (sería un import circular).
+// ⚠ Es un filtro de interfaz, no de seguridad: GET /solicitudes/cabecera ya
+// devuelve todas las solicitudes a cualquiera que lo llame.
+const USUARIOS_VEN_TODAS_SOLICITUDES = ["JOSEG"];
+
+export function veTodasLasSolicitudes(username = getStoredUsername()): boolean {
+  return !!username && USUARIOS_VEN_TODAS_SOLICITUDES.includes(username.trim().toUpperCase());
+}
+
+// Las cabeceras del usuario logueado (o todas, ver veTodasLasSolicitudes).
+// Filtro client-side por cod_usuario: el feed ORDS retorna esa columna y el
+// login solo expone el username.
+//
+// Recorre TODAS las páginas: ORDS pagina de a 25, y antes se pedía una sola y
+// se filtraba sobre esas 25, así que cada asesor veía solo las suyas entre las
+// 25 primeras de todos (corregido el 2026-10-19).
 export async function listarCabeceras() {
-  const { items = [] } = await request<OrdsFeed<Cabecera>>("/solicitudes/cabecera");
+  const items: Cabecera[] = [];
+  let offset = 0;
+  for (;;) {
+    const f = await request<OrdsFeed<Cabecera> & { hasMore?: boolean }>(
+      `/solicitudes/cabecera?limit=500&offset=${offset}`,
+    );
+    const page = f.items ?? [];
+    items.push(...page);
+    if (!f.hasMore || page.length === 0) break;
+    offset += page.length;
+  }
   const me = getStoredUsername();
-  if (!me) return items;
+  if (!me || veTodasLasSolicitudes(me)) return items;
   return items.filter((c) => (c.cod_usuario ?? "").toUpperCase() === me.toUpperCase());
 }
 
@@ -698,7 +761,11 @@ export type CreditoReferencia = {
   telefono?: string;
   nombre_apellido?: string;
   ind_garante?: string; // 'S' | 'N'
-};
+  // 2026-10-19: los copia TRG_APROBAR_SOLICITUD desde la solicitud. Los
+  // creditos aprobados antes los tienen vacios.
+  nro_documento?: string | null;
+  profesion?: string | null; // descripcion de cod_profesion, ya resuelta
+} & Partial<DatosGarante>;
 
 export type CreditoCuota = {
   id: number;
@@ -1082,6 +1149,36 @@ export function listarComprasPeriodo(f: { desde: string; hasta: string; codProve
   const qs = new URLSearchParams({ desde: f.desde, hasta: f.hasta });
   if (f.codProveedor) qs.set("cod_proveedor", String(f.codProveedor));
   return request<{ items: CompraPeriodo[] }>(`/proveedores/compras?${qs}`).then(
+    (r) => r.items ?? [],
+  );
+}
+
+// Un cheque entregado a un proveedor (RECIBOS_COMPRA_PAGOS con forma CHEQUE),
+// con los datos de su recibo. La base no registra si ya se cobro: un
+// vencimiento pasado quiere decir que el proveedor ya lo pudo cobrar.
+export type ChequeProveedor = {
+  id_pago: number;
+  nro_documento?: string; // nro. de cheque
+  banco?: string;
+  fecha_emision?: string; // YYYY-MM-DD
+  fecha_vencimiento: string; // YYYY-MM-DD
+  monto: number;
+  id_recibo: number;
+  nro_recibo: string;
+  fecha_recibo: string; // YYYY-MM-DD
+  monto_recibo: number; // si es mayor que `monto`, el recibo se pago tambien con otras formas
+  cod_proveedor: number;
+  proveedor?: string;
+  documento?: string;
+  facturas?: string; // nros. de factura del recibo separados por coma
+};
+
+// Cheques con vencimiento entre `desde` y `hasta` (YYYY-MM-DD, los dos
+// incluidos), ordenados por vencimiento.
+export function listarChequesProveedor(f: { desde: string; hasta: string; codProveedor?: number }) {
+  const qs = new URLSearchParams({ desde: f.desde, hasta: f.hasta });
+  if (f.codProveedor) qs.set("cod_proveedor", String(f.codProveedor));
+  return request<{ items: ChequeProveedor[] }>(`/proveedores/cheques?${qs}`).then(
     (r) => r.items ?? [],
   );
 }

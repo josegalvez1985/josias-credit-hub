@@ -168,7 +168,7 @@ la cabecera de [backend/proveedores.sql](backend/proveedores.sql).
 | --- | --- |
 | `backend/proveedores.sql` | ⚠️ **Caído hasta redesplegar** (2026-10-19): se borró `FORMA_PAGO` de la cabecera, el body del paquete quedó `INVALID` y los GET de recibos, detalle y pagos dan 500. Redesplegar sección 2 → 3.a → 3.b, y después la 1.b a mano (pagos de los recibos viejos) |
 | Cliente HTTP | ✅ hecho — `listarFacturasCompra`, `listarRecibosProveedor`, `obtenerReciboProveedor`, `crearReciboProveedor`, `eliminarReciboProveedor`, `lovProveedores`, `listarPagosFacturas`, `listarArticulosFactura` |
-| Reporte | ✅ hecho — Saldos de Proveedores (Administración → Reportes), ver `GUIA-FRONTEND.md` §10 |
+| Reportes | ✅ hechos — Saldos de Proveedores, Compras por Período y Cheques a Vencer (Administración → Reportes), ver `GUIA-FRONTEND.md` §10. Cheques a Vencer usa `GET /proveedores/cheques` (2026-10-19), que ⏳ **sale con el mismo redespliegue** del módulo |
 | Listado | ✅ hecho — [\_app.admin.recibos-proveedores.index.tsx](src/routes/_app.admin.recibos-proveedores.index.tsx), pestañas facturas / recibos |
 | Alta | ✅ hecha — [\_app.admin.recibos-proveedores.nuevo.tsx](src/routes/_app.admin.recibos-proveedores.nuevo.tsx) |
 | Detalle y baja | ✅ hecho — [\_app.admin.recibos-proveedores.$id.tsx](src/routes/_app.admin.recibos-proveedores.$id.tsx) |
@@ -223,6 +223,9 @@ Lo que no es obvio:
 - **`SOLICITUD_VENTAS_ACTIVIDAD_LABORAL.COD_PROFESION` no tiene FK.** Solo
   `VENTAS_ACTIVIDAD_LABORAL` la tiene. El paquete cuenta las dos antes de
   borrar; sin eso, Oracle dejaría borrar una profesión usada en solicitudes.
+  Desde el 2026-10-19 cuenta también los garantes
+  (`SOLICITUD_VENTAS_REFERENCIAS.COD_PROFESION`, con FK), para dar el mensaje
+  legible y no un `ORA-02292`.
 - La descripción se guarda **como se escribe** (sin forzar mayúsculas), sin
   espacios de más, y no se puede repetir sin distinguir mayúsculas.
 - Editar renombra la profesión en todas las solicitudes y créditos que la
@@ -235,6 +238,15 @@ Lo que no es obvio:
 `SOLICITUD_VENTAS_*` son la solicitud que carga el asesor (módulo
 `solicitudes`); las `VENTAS_*` son el crédito ya otorgado. Confundirlas es fácil
 porque los nombres de columna se parecen.
+
+**La solicitud pasa al crédito por trigger.** `TRG_APROBAR_SOLICITUD` (sobre
+`SOLICITUD_VENTAS_CABECERA`, al pasar `ESTADO` a `'APROBADA'`) copia cabecera,
+detalle, referencias y actividad a las `VENTAS_*`; `TRG_BLOQUEA_SOLICITUD_APROBADA`
+impide después cambiar los datos. **Una columna nueva en una tabla `SOLICITUD_VENTAS_*`
+no llega al crédito si no se agrega también a la `VENTAS_*` y al `INSERT` del
+trigger.** El trigger está versionado en la sección 0 de
+[backend/solicitudes.sql](backend/solicitudes.sql) desde el 2026-10-19 (cédula y
+datos del garante en las referencias).
 
 **Es de solo lectura a propósito, no por falta de tiempo.** Sobre
 `VENTAS_CABECERA` hay cinco triggers que regeneran el plan entero de
