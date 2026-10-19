@@ -852,7 +852,7 @@ export async function crearSolicitud(s: SolicitudCompleta): Promise<{ id: number
 // facturas. Qué datos lleva cada una lo exige el CHECK RECIBOS_COMPRA_PAG_CK_DATOS:
 //   EFECTIVO       solo monto
 //   TRANSFERENCIA  nro. de transferencia
-//   CHEQUE         nro. de cheque + fecha de emisión + fecha de vencimiento
+//   CHEQUE         nro. de cheque + banco + fecha de emisión + fecha de vencimiento
 // ⚠ Antes era una sola letra en la cabecera (E/T/Q/D/C). La columna se borró y
 // los recibos viejos no tienen pagos cargados: ver la 1.b de proveedores.sql.
 export type FormaPago = "EFECTIVO" | "TRANSFERENCIA" | "CHEQUE";
@@ -940,6 +940,7 @@ export type PagoRecibo = {
   id_pago: number;
   forma_pago: FormaPago;
   nro_documento?: string;
+  banco?: string; // solo cheque, obligatorio ahí
   fecha_emision?: string; // YYYY-MM-DD, solo cheque
   fecha_vencimiento?: string; // YYYY-MM-DD, solo cheque
   monto: number;

@@ -177,6 +177,7 @@ function ReciboProveedorPage() {
                 <TableRow className="bg-muted/60 hover:bg-muted/60">
                   <TableHead>Forma</TableHead>
                   <TableHead>Nro.</TableHead>
+                  <TableHead>Banco</TableHead>
                   <TableHead>Emisión</TableHead>
                   <TableHead>Vencimiento</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
@@ -190,6 +191,11 @@ function ReciboProveedorPage() {
                       <TableCell className="font-medium">{FORMAS_PAGO[p.forma_pago] ?? p.forma_pago}</TableCell>
                       <TableCell className="whitespace-nowrap font-mono text-xs">
                         {p.nro_documento || "—"}
+                      </TableCell>
+                      <TableCell className="max-w-[14rem]">
+                        <p className="truncate" title={p.banco}>
+                          {p.banco || "—"}
+                        </p>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {p.fecha_emision ? fechaPy(p.fecha_emision) : "—"}

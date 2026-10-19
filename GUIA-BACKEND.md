@@ -191,7 +191,9 @@ Lo que no es obvio:
 - Sin anulación ni edición: un error se corrige eliminando y volviendo a cargar.
 - **Formas de pago (2026-10-19)**: van en `RECIBOS_COMPRA_PAGOS`, **una o
   varias por recibo**: EFECTIVO (solo monto) · TRANSFERENCIA (+ nro.) · CHEQUE
-  (+ nro., emisión y vencimiento; diferido si vence después de hoy). Entre
+  (+ nro., banco, emisión y vencimiento; diferido si vence después de hoy).
+  `BANCO` no tiene `CHECK`: lo exige el paquete en el cheque y lo deja NULL
+  en las otras formas. Entre
   todas suman **exactamente** lo aplicado a las facturas. Los `CHECK` de la
   tabla exigen los datos de cada forma; el paquete los repite con mensajes
   legibles. Los nombres viven en `FORMAS_PAGO` / `DOCUMENTO_DE` de `api.ts`,

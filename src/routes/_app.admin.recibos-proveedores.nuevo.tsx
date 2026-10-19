@@ -66,12 +66,13 @@ export const Route = createFileRoute("/_app/admin/recibos-proveedores/nuevo")({
   component: NuevoReciboProveedor,
 });
 
-// Una forma de pago mientras se carga. `monto` guarda solo dígitos; las fechas
-// solo las usa el cheque (en las otras formas no se mandan).
+// Una forma de pago mientras se carga. `monto` guarda solo dígitos; banco y
+// fechas solo los usa el cheque (en las otras formas no se mandan).
 type PagoForm = {
   key: number;
   forma: FormaPago;
   nro: string;
+  banco: string;
   emision: string; // YYYY-MM-DD
   vencimiento: string; // YYYY-MM-DD
   monto: string;
@@ -190,6 +191,7 @@ function NuevoReciboProveedor() {
         key,
         forma,
         nro: "",
+        banco: "",
         emision: forma === "CHEQUE" ? fecha : "",
         vencimiento: forma === "CHEQUE" ? fecha : "",
         monto: diferencia > 0 ? String(diferencia) : "",
@@ -221,6 +223,7 @@ function NuevoReciboProveedor() {
       const n = `pago ${i + 1}`;
       const doc = DOCUMENTO_DE[p.forma];
       if (doc && !p.nro.trim()) faltantes.push(`${doc} (${n})`);
+      if (p.forma === "CHEQUE" && !p.banco.trim()) faltantes.push(`Banco (${n})`);
       if (p.forma === "CHEQUE" && !p.emision) faltantes.push(`Emisión (${n})`);
       if (p.forma === "CHEQUE" && !p.vencimiento) faltantes.push(`Vencimiento (${n})`);
       if (!(Number(p.monto) > 0)) faltantes.push(`Monto (${n})`);
@@ -277,6 +280,7 @@ function NuevoReciboProveedor() {
         pagos: pagos.map((p) => ({
           forma_pago: p.forma,
           nro_documento: p.forma === "EFECTIVO" ? undefined : p.nro.trim(),
+          banco: p.forma === "CHEQUE" ? p.banco.trim() : undefined,
           fecha_emision: p.forma === "CHEQUE" ? p.emision : undefined,
           fecha_vencimiento: p.forma === "CHEQUE" ? p.vencimiento : undefined,
           monto: Number(p.monto),
@@ -678,9 +682,19 @@ function PagoCard({
       <div
         className={cn(
           "grid grid-cols-1 gap-3",
-          esCheque ? "sm:grid-cols-2 xl:grid-cols-4" : doc ? "sm:grid-cols-2" : "sm:max-w-xs",
+          esCheque ? "sm:grid-cols-2 xl:grid-cols-3" : doc ? "sm:grid-cols-2" : "sm:max-w-xs",
         )}
       >
+        {esCheque && (
+          <Field label="Banco" required>
+            <Input
+              value={pago.banco}
+              onChange={(e) => onChange({ banco: e.target.value })}
+              maxLength={100}
+              placeholder="Banco que emite el cheque"
+            />
+          </Field>
+        )}
         {doc && (
           <Field label={doc} required>
             <Input

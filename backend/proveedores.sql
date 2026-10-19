@@ -49,8 +49,10 @@
 --   legible en vez de un ORA-02290):
 --       EFECTIVO        solo monto
 --       TRANSFERENCIA   nro. de transferencia + monto
---       CHEQUE          nro. de cheque + fecha de emisión + fecha de
---                       vencimiento (>= emisión) + monto
+--       CHEQUE          nro. de cheque + banco + fecha de emisión + fecha
+--                       de vencimiento (>= emisión) + monto
+--   BANCO (2026-10-19) no tiene CHECK: que sea obligatorio en el cheque y NULL
+--   en las otras formas lo pone el paquete.
 --   La emisión del cheque no puede ser posterior a la fecha del recibo; el
 --   vencimiento sí puede ser futuro (cheque diferido).
 --   QR y tarjetas dejaron de existir. La columna FORMA_PAGO de la cabecera se
@@ -180,7 +182,8 @@
 --     FECHA_EMISION      DATE                  solo cheque
 --     FECHA_VENCIMIENTO  DATE                  solo cheque, CHECK >= FECHA_EMISION
 --     MONTO              NUMBER(15,2) NOT NULL CHECK > 0
---     CHECK RECIBOS_COMPRA_PAG_CK_DATOS: qué datos lleva cada forma
+--     BANCO              VARCHAR2(100)         banco que emite el cheque (agregada 2026-10-19)
+--     CHECK RECIBOS_COMPRA_PAG_CK_DATOS: qué datos lleva cada forma (BANCO no entra)
 --
 --   PROVEEDORES: COD_PROVEEDOR (identity) · NOMBRE · RUC (UK) · CI (UK)
 
@@ -213,6 +216,7 @@ CREATE OR REPLACE PACKAGE pkg_recibos_compra AS
   --       { "forma_pago": "EFECTIVO",      "monto": 1040000 },
   --       { "forma_pago": "TRANSFERENCIA", "nro_documento": "889911", "monto": 2000000 },
   --       { "forma_pago": "CHEQUE",        "nro_documento": "4471",
+  --         "banco": "Banco Continental",
   --         "fecha_emision": "2026-10-19", "fecha_vencimiento": "2026-11-19",
   --         "monto": 4000000 }
   --     ]
@@ -287,6 +291,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_recibos_compra AS
     l_nro_doc         VARCHAR2(4000);
     l_emision         DATE;
     l_vencimiento     DATE;
+    l_banco           VARCHAR2(4000);
     l_pago            VARCHAR2(100);   -- "Pago 2 (cheque)", para los mensajes
   BEGIN
     IF es_admin(p_cod_usuario) <> 'S' THEN
@@ -516,11 +521,12 @@ CREATE OR REPLACE PACKAGE BODY pkg_recibos_compra AS
     -- está mal y no "ORA-02290: RECIBOS_COMPRA_PAG_CK_DATOS".
     ------------------------------------------------------------------
     FOR p IN (
-      SELECT n, forma_pago, nro_documento, fecha_emision, fecha_vencimiento, monto
+      SELECT n, forma_pago, nro_documento, banco, fecha_emision, fecha_vencimiento, monto
         FROM JSON_TABLE(p_body, '$.pagos[*]'
                COLUMNS (n                 FOR ORDINALITY,
                         forma_pago        VARCHAR2(4000) PATH '$.forma_pago',
                         nro_documento     VARCHAR2(4000) PATH '$.nro_documento',
+                        banco             VARCHAR2(4000) PATH '$.banco',
                         fecha_emision     VARCHAR2(4000) PATH '$.fecha_emision',
                         fecha_vencimiento VARCHAR2(4000) PATH '$.fecha_vencimiento',
                         monto             NUMBER         PATH '$.monto'))
@@ -528,6 +534,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_recibos_compra AS
     ) LOOP
       l_forma       := UPPER(TRIM(p.forma_pago));
       l_nro_doc     := TRIM(p.nro_documento);
+      l_banco       := NULL;
       l_emision     := NULL;
       l_vencimiento := NULL;
 
@@ -558,8 +565,16 @@ CREATE OR REPLACE PACKAGE BODY pkg_recibos_compra AS
         END IF;
       END IF;
 
-      -- Solo el cheque lleva fechas; en las otras formas se ignoran.
+      -- Solo el cheque lleva banco y fechas; en las otras formas se ignoran.
       IF l_forma = 'CHEQUE' THEN
+        l_banco := TRIM(p.banco);
+        IF l_banco IS NULL THEN
+          RAISE_APPLICATION_ERROR(-20538, l_pago || ': falta el banco');
+        END IF;
+        IF LENGTH(l_banco) > 100 THEN
+          RAISE_APPLICATION_ERROR(-20540, l_pago || ': el banco admite hasta 100 caracteres');
+        END IF;
+
         IF TRIM(p.fecha_emision) IS NULL OR TRIM(p.fecha_vencimiento) IS NULL THEN
           RAISE_APPLICATION_ERROR(-20534,
             l_pago || ': faltan la fecha de emisión y la de vencimiento');
@@ -583,10 +598,10 @@ CREATE OR REPLACE PACKAGE BODY pkg_recibos_compra AS
       END IF;
 
       INSERT INTO recibos_compra_pagos (
-        id_pago, id_recibo, forma_pago, nro_documento,
+        id_pago, id_recibo, forma_pago, nro_documento, banco,
         fecha_emision, fecha_vencimiento, monto
       ) VALUES (
-        NULL, l_id_recibo, l_forma, l_nro_doc,
+        NULL, l_id_recibo, l_forma, l_nro_doc, l_banco,
         l_emision, l_vencimiento, p.monto
       );
     END LOOP;
@@ -1097,7 +1112,7 @@ BEGIN
 
           apex_json.open_array(''pagos'');
           FOR pg IN (
-            SELECT id_pago, forma_pago, nro_documento,
+            SELECT id_pago, forma_pago, nro_documento, banco,
                    fecha_emision, fecha_vencimiento, monto
               FROM recibos_compra_pagos
              WHERE id_recibo = r.id_recibo
@@ -1107,6 +1122,7 @@ BEGIN
             apex_json.write(''id_pago'',           pg.id_pago);
             apex_json.write(''forma_pago'',        pg.forma_pago);
             apex_json.write(''nro_documento'',     pg.nro_documento);
+            apex_json.write(''banco'',             pg.banco);
             apex_json.write(''fecha_emision'',     TO_CHAR(pg.fecha_emision, ''YYYY-MM-DD''));
             apex_json.write(''fecha_vencimiento'', TO_CHAR(pg.fecha_vencimiento, ''YYYY-MM-DD''));
             apex_json.write(''monto'',             pg.monto);
@@ -1554,6 +1570,7 @@ END;
 --             "facturas":[{"id_cabecera":<ID>,"monto_aplicado":3000}],
 --             "pagos":[{"forma_pago":"EFECTIVO","monto":1000},
 --                      {"forma_pago":"CHEQUE","nro_documento":"PRUEBA","monto":2000,
+--                       "banco":"Banco de prueba",
 --                       "fecha_emision":"2026-10-19","fecha_vencimiento":"2026-11-19"}]}'
 --   -> 201 {"success": true, "id_recibo": N}
 --
