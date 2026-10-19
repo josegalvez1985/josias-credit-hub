@@ -12,9 +12,9 @@ import {
 } from "lucide-react";
 import {
   estadoFactura,
-  FORMAS_PAGO,
   listarFacturasCompra,
   listarRecibosProveedor,
+  textoFormasPago,
   type FacturaCompra,
   type ReciboProveedor,
 } from "@/lib/api";
@@ -302,7 +302,12 @@ function TablaFacturas({ facturas }: { facturas: FacturaCompra[] }) {
         </Card>
       )}
 
-      <ArticulosFacturaDialog factura={verFactura} onClose={() => setVerFactura(null)} />
+      <ArticulosFacturaDialog
+        factura={verFactura}
+        onClose={() => setVerFactura(null)}
+        lista={visibles}
+        onCambiar={setVerFactura}
+      />
     </div>
   );
 }
@@ -313,7 +318,7 @@ function TablaRecibos({ recibos }: { recibos: ReciboProveedor[] }) {
   const visibles = useMemo(
     () =>
       recibos.filter((r) =>
-        coincide(query, r.proveedor, r.documento, r.nro_recibo, r.nro_comprobante, r.facturas),
+        coincide(query, r.proveedor, r.documento, r.nro_recibo, r.formas_pago, r.facturas),
       ),
     [recibos, query],
   );
@@ -323,7 +328,7 @@ function TablaRecibos({ recibos }: { recibos: ReciboProveedor[] }) {
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Buscar por proveedor, RUC, nro. de recibo, comprobante o factura..."
+          placeholder="Buscar por proveedor, RUC, nro. de recibo, de cheque o de factura..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="h-11 rounded-full bg-card pl-10"
@@ -381,15 +386,16 @@ function TablaRecibos({ recibos }: { recibos: ReciboProveedor[] }) {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="max-w-[12rem]">
-                      <div className="min-w-0">
-                        <p className="truncate">{r.forma_pago ? FORMAS_PAGO[r.forma_pago] : "—"}</p>
-                        {r.nro_comprobante && (
-                          <p className="truncate text-xs text-muted-foreground">
-                            {r.nro_comprobante}
-                          </p>
-                        )}
-                      </div>
+                    <TableCell className="max-w-[14rem]">
+                      {/* Sin pagos: recibo anterior al 2026-10-19, la forma
+                          de pago se perdió con la columna vieja. */}
+                      {r.formas_pago ? (
+                        <p className="truncate" title={textoFormasPago(r.formas_pago)}>
+                          {textoFormasPago(r.formas_pago)}
+                        </p>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Sin registrar</span>
+                      )}
                     </TableCell>
                     <TableCell className="max-w-[16rem]">
                       <p className="truncate font-mono text-xs" title={r.facturas}>

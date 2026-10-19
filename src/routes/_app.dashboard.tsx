@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowUpRight, FilePlus, FileText, Sparkles, Loader2 } from "lucide-react";
+import { ArrowUpRight, FilePlus, FileText, LayoutDashboard, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency } from "@/lib/credit-applications";
 import { listarCabeceras, nombresClientes, type Cabecera } from "@/lib/api";
@@ -55,7 +55,7 @@ function Dashboard() {
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-xl">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider ring-1 ring-white/20">
-              <Sparkles className="h-3 w-3" />
+              <LayoutDashboard className="h-3 w-3" />
               Panel del asesor
             </div>
             <h1 className="mt-4 font-display text-3xl font-semibold sm:text-4xl">

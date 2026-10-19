@@ -847,28 +847,44 @@ export async function crearSolicitud(s: SolicitudCompleta): Promise<{ id: number
 // usuario sin permiso recibe 400 con mensaje, no 403, para que request() no lo
 // expulse al login.
 
-// Formas de pago de RECIBOS_COMPRA_CABECERA.FORMA_PAGO (VARCHAR2(1), sin
-// CHECK: las valida pkg_recibos_compra.crear). El orden es el de los botones.
-// ⚠ Hasta el 2026-09-24 la C era CHEQUE; ahora es tarjeta de crédito.
-export type FormaPago = "E" | "T" | "Q" | "D" | "C";
+// Formas de pago de RECIBOS_COMPRA_PAGOS.FORMA_PAGO (2026-10-19). Un recibo
+// tiene una o varias, y entre todas suman exactamente lo aplicado a las
+// facturas. Qué datos lleva cada una lo exige el CHECK RECIBOS_COMPRA_PAG_CK_DATOS:
+//   EFECTIVO       solo monto
+//   TRANSFERENCIA  nro. de transferencia
+//   CHEQUE         nro. de cheque + fecha de emisión + fecha de vencimiento
+// ⚠ Antes era una sola letra en la cabecera (E/T/Q/D/C). La columna se borró y
+// los recibos viejos no tienen pagos cargados: ver la 1.b de proveedores.sql.
+export type FormaPago = "EFECTIVO" | "TRANSFERENCIA" | "CHEQUE";
 
 export const FORMAS_PAGO: Record<FormaPago, string> = {
-  E: "Efectivo",
-  T: "Transferencia Bancaria",
-  Q: "QR",
-  D: "Tarjeta de Débito",
-  C: "Tarjeta de Crédito",
+  EFECTIVO: "Efectivo",
+  TRANSFERENCIA: "Transferencia",
+  CHEQUE: "Cheque",
 };
 
-// Cómo se llama el nro. de comprobante en cada forma de pago. Es obligatorio en
-// todas menos efectivo, que no lleva (null).
-export const COMPROBANTE_DE: Record<FormaPago, string | null> = {
-  E: null,
-  T: "Nro. de transferencia",
-  Q: "Nro. de operación QR",
-  D: "Nro. de voucher",
-  C: "Nro. de voucher",
+// Cómo se llama el nro. de documento en cada forma (null: no lleva).
+export const DOCUMENTO_DE: Record<FormaPago, string | null> = {
+  EFECTIVO: null,
+  TRANSFERENCIA: "Nro. de transferencia",
+  CHEQUE: "Nro. de cheque",
 };
+
+// "EFECTIVO + CHEQUE 4471" (como lo arma Oracle en `formas_pago`) →
+// "Efectivo + Cheque 4471". Vacío si el recibo no tiene pagos cargados.
+export function textoFormasPago(resumen?: string | null): string {
+  if (!resumen) return "";
+  return resumen
+    .split(" + ")
+    .map((seg) => {
+      const i = seg.indexOf(" ");
+      const forma = i < 0 ? seg : seg.slice(0, i);
+      const nro = i < 0 ? "" : seg.slice(i + 1);
+      const label = FORMAS_PAGO[forma as FormaPago] ?? forma;
+      return nro ? `${label} ${nro}` : label;
+    })
+    .join(" + ");
+}
 
 // Factura de compra a credito (COMPRAS_CABECERA con TIPO 'C' y CONDICION_COMPRA 2).
 // La tabla no guarda el monto: `total` es SUM(cantidad * precio_unitario) de
@@ -912,12 +928,21 @@ export type ReciboProveedor = {
   cod_proveedor: number;
   proveedor?: string;
   documento?: string;
-  forma_pago?: FormaPago;
-  nro_comprobante?: string;
+  formas_pago?: string; // resumen de los pagos, ver textoFormasPago
   monto_total: number;
   observacion?: string;
   cant_facturas: number;
   facturas?: string; // nros. de factura separados por coma
+};
+
+// Una fila de RECIBOS_COMPRA_PAGOS.
+export type PagoRecibo = {
+  id_pago: number;
+  forma_pago: FormaPago;
+  nro_documento?: string;
+  fecha_emision?: string; // YYYY-MM-DD, solo cheque
+  fecha_vencimiento?: string; // YYYY-MM-DD, solo cheque
+  monto: number;
 };
 
 export type ReciboProveedorFactura = {
@@ -930,8 +955,12 @@ export type ReciboProveedorFactura = {
   saldo: number; // el saldo de HOY, no el del momento del pago
 };
 
-export type ReciboProveedorDetalle = Omit<ReciboProveedor, "cant_facturas" | "facturas"> & {
+export type ReciboProveedorDetalle = Omit<
+  ReciboProveedor,
+  "cant_facturas" | "facturas" | "formas_pago"
+> & {
   facturas: ReciboProveedorFactura[];
+  pagos: PagoRecibo[]; // vacío en los recibos anteriores al 2026-10-19
 };
 
 export type ProveedorLov = LovItem & {
@@ -944,10 +973,10 @@ export type ReciboProveedorInput = {
   cod_proveedor: number;
   nro_recibo: string;
   fecha: string; // YYYY-MM-DD
-  forma_pago: FormaPago;
-  nro_comprobante?: string; // obligatorio salvo en efectivo (ver COMPROBANTE_DE)
   observacion?: string;
   facturas: { id_cabecera: number; monto_aplicado: number }[];
+  // Suman exactamente lo mismo que `facturas`.
+  pagos: Omit<PagoRecibo, "id_pago">[];
 };
 
 export function listarFacturasCompra(f: { codProveedor?: number; pendientes?: boolean } = {}) {
@@ -967,6 +996,7 @@ export type ArticuloFacturaCompra = {
   id_detalle: number;
   cod_articulo?: number;
   articulo?: string;
+  unidad?: string; // ARTICULOS.COD_UNIDAD_MEDIDA (UN, MT...); sin desplegar el módulo, no viene
   cantidad?: number;
   precio_unitario?: number;
   subtotal: number;
@@ -989,9 +1019,10 @@ export function obtenerReciboProveedor(id: number) {
   return request<ReciboProveedorDetalle>(`/proveedores/recibos/${id}`);
 }
 
-// Cabecera y facturas viajan juntas y el paquete las graba en UNA transaccion:
-// no es el patron de crearSolicitud (un POST por hijo), que puede dejar datos
-// a medias. MONTO_TOTAL no se manda: lo calcula Oracle con la suma del detalle.
+// Cabecera, facturas y pagos viajan juntos y el paquete los graba en UNA
+// transaccion: no es el patron de crearSolicitud (un POST por hijo), que puede
+// dejar datos a medias. MONTO_TOTAL no se manda: lo calcula Oracle con la suma
+// del detalle.
 export function crearReciboProveedor(r: ReciboProveedorInput) {
   return request<{ id_recibo: number }>("/proveedores/recibos", {
     method: "POST",
@@ -1025,13 +1056,33 @@ export type PagoFactura = {
   id_recibo: number;
   nro_recibo: string;
   fecha: string; // YYYY-MM-DD, la del recibo
-  forma_pago?: FormaPago;
-  nro_comprobante?: string;
+  formas_pago?: string; // resumen de los pagos del recibo, ver textoFormasPago
 };
 
 export function listarPagosFacturas(f: { codProveedor?: number } = {}) {
   const qs = f.codProveedor ? `?cod_proveedor=${f.codProveedor}` : "";
   return request<{ items: PagoFactura[] }>(`/proveedores/pagos${qs}`).then((r) => r.items ?? []);
+}
+
+// Condicion de una compra (COMPRAS_CABECERA.CONDICION_COMPRA).
+export const CONDICIONES_COMPRA: Record<number, string> = {
+  1: "Contado",
+  2: "Crédito",
+};
+
+// Factura de compra para el reporte Compras por Periodo: contado y credito.
+// En contado, `pagado` = total y `saldo` = 0 (se paga en el momento); en
+// credito salen de los recibos, como en FacturaCompra.
+export type CompraPeriodo = FacturaCompra & { condicion_compra?: number };
+
+// TIPO 'C' con MOTIVO 'C' (compra) o 'E' (entrada). `desde` y `hasta` son
+// YYYY-MM-DD, los dos incluidos.
+export function listarComprasPeriodo(f: { desde: string; hasta: string; codProveedor?: number }) {
+  const qs = new URLSearchParams({ desde: f.desde, hasta: f.hasta });
+  if (f.codProveedor) qs.set("cod_proveedor", String(f.codProveedor));
+  return request<{ items: CompraPeriodo[] }>(`/proveedores/compras?${qs}`).then(
+    (r) => r.items ?? [],
+  );
 }
 
 // Solo proveedores con alguna factura a credito. La busqueda va en el cliente.

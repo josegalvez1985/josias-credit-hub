@@ -2,10 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, AlertTriangle, FileChartColumn, Loader2, RefreshCw, X } from "lucide-react";
 import {
-  FORMAS_PAGO,
   filtrarLov,
   listarFacturasCompra,
   listarPagosFacturas,
+  textoFormasPago,
   type FacturaCompra,
   type LovItem,
   type PagoFactura,
@@ -484,9 +484,7 @@ function VistaDetalle({ grupos, pagos }: { grupos: Grupo[]; pagos: PagosPorFactu
 // Un recibo debajo de su factura. El monto va en la columna "Pagado": los
 // recibos de una factura suman lo que dice su fila. El número abre el recibo.
 function FilaRecibo({ p }: { p: PagoFactura }) {
-  const forma = [p.forma_pago ? FORMAS_PAGO[p.forma_pago] : "", p.nro_comprobante]
-    .filter(Boolean)
-    .join(" ");
+  const forma = textoFormasPago(p.formas_pago);
   return (
     <TableRow className="text-xs text-muted-foreground hover:bg-transparent">
       <TableCell className="whitespace-nowrap py-1.5">{fechaPy(p.fecha)}</TableCell>

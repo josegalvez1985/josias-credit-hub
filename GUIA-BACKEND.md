@@ -166,7 +166,7 @@ la cabecera de [backend/proveedores.sql](backend/proveedores.sql).
 
 | Pieza | Estado |
 | --- | --- |
-| `backend/proveedores.sql` | ✅ desplegado — `pkg_recibos_compra` + módulo ORDS `proveedores`. ⏳ **Falta redesplegar** dos cambios del 2026-09-24: el paquete (formas de pago nuevas, sección 2) y el módulo (handler `GET pagos` para el reporte, 3.a + 3.b). Antes, correr a mano la 1.a |
+| `backend/proveedores.sql` | ⚠️ **Caído hasta redesplegar** (2026-10-19): se borró `FORMA_PAGO` de la cabecera, el body del paquete quedó `INVALID` y los GET de recibos, detalle y pagos dan 500. Redesplegar sección 2 → 3.a → 3.b, y después la 1.b a mano (pagos de los recibos viejos) |
 | Cliente HTTP | ✅ hecho — `listarFacturasCompra`, `listarRecibosProveedor`, `obtenerReciboProveedor`, `crearReciboProveedor`, `eliminarReciboProveedor`, `lovProveedores`, `listarPagosFacturas`, `listarArticulosFactura` |
 | Reporte | ✅ hecho — Saldos de Proveedores (Administración → Reportes), ver `GUIA-FRONTEND.md` §10 |
 | Listado | ✅ hecho — [\_app.admin.recibos-proveedores.index.tsx](src/routes/_app.admin.recibos-proveedores.index.tsx), pestañas facturas / recibos |
@@ -189,11 +189,16 @@ Lo que no es obvio:
   `permisos.ts`), y "sin permiso" responde **400, no 403**: `api.ts` trata el
   403 como sesión vencida y manda al login.
 - Sin anulación ni edición: un error se corrige eliminando y volviendo a cargar.
-- **Formas de pago**: E Efectivo · T Transferencia Bancaria · Q QR · D Tarjeta
-  de Débito · C Tarjeta de Crédito. Todas menos efectivo piden nro. de
-  comprobante. ⚠ Hasta el 2026-09-24 la **C era cheque**: un recibo viejo con C
-  se lee hoy como tarjeta de crédito (consulta en la sección 1.a del `.sql`).
-  Los nombres viven en `FORMAS_PAGO` / `COMPROBANTE_DE` de `api.ts`.
+- **Formas de pago (2026-10-19)**: van en `RECIBOS_COMPRA_PAGOS`, **una o
+  varias por recibo**: EFECTIVO (solo monto) · TRANSFERENCIA (+ nro.) · CHEQUE
+  (+ nro., emisión y vencimiento; diferido si vence después de hoy). Entre
+  todas suman **exactamente** lo aplicado a las facturas. Los `CHECK` de la
+  tabla exigen los datos de cada forma; el paquete los repite con mensajes
+  legibles. Los nombres viven en `FORMAS_PAGO` / `DOCUMENTO_DE` de `api.ts`,
+  y el resumen `formas_pago` de los GET se traduce con `textoFormasPago()`.
+- **La columna `FORMA_PAGO` de la cabecera se borró** y con ella la forma de
+  pago de los recibos anteriores: se ven "Sin registrar" hasta correr la 1.b
+  del `.sql`. `NRO_COMPROBANTE` quedó sin uso.
 - **Una factura con total 0 no está pagada**: no tiene artículos con precio en
   `COMPRAS_DETALLE`. Las pantallas la muestran como "Sin monto"
   (`estadoFactura` en `api.ts`), no como "Pagada".

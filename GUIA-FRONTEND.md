@@ -334,6 +334,11 @@ documentos en hoja (logo, tabla con encabezado oscuro, `@page { margin: 0 }`,
 | Reporte | Archivo | Pantalla |
 | --- | --- | --- |
 | Saldos de Proveedores | [reporte-saldos-proveedores.ts](src/lib/reporte-saldos-proveedores.ts) | Administración → Reportes |
+| Compras por Período | [reporte-compras.ts](src/lib/reporte-compras.ts) | Administración → Reportes |
+
+Lo común (estilo, encabezado, pie, márgenes y la apertura de la pestaña) vive
+en [reporte-a4.ts](src/lib/reporte-a4.ts): un reporte nuevo arma su cuerpo y
+llama a `documentoA4` y `abrirReporteA4`, sin copiar CSS.
 
 - **Margen en todas las hojas.** Con `@page` en cero, el padding de `.hoja` solo
   da margen arriba de la primera hoja y abajo de la última. Las hojas del medio

@@ -1,8 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { AlertCircle, ArrowLeft, FileText, Loader2, Package, Receipt, Trash2 } from "lucide-react";
 import {
-  COMPROBANTE_DE,
+  AlertCircle,
+  ArrowLeft,
+  FileText,
+  Loader2,
+  Package,
+  Receipt,
+  Trash2,
+  Wallet,
+} from "lucide-react";
+import {
   eliminarReciboProveedor,
   FORMAS_PAGO,
   obtenerReciboProveedor,
@@ -10,7 +18,7 @@ import {
   type ReciboProveedorFactura,
 } from "@/lib/api";
 import { formatCurrency } from "@/lib/credit-applications";
-import { fechaPy } from "@/lib/utils";
+import { fechaPy, hoyISO } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -98,8 +106,7 @@ function ReciboProveedorPage() {
   }
 
   const r = recibo;
-  // null en efectivo: no lleva comprobante.
-  const comprobante = r.forma_pago ? COMPROBANTE_DE[r.forma_pago] : null;
+  const hoy = hoyISO();
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -142,13 +149,73 @@ function ReciboProveedorPage() {
         <Titulo icon={<Receipt className="h-5 w-5" />} texto="Datos del recibo" />
         <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
           <Row label="Fecha" value={fechaPy(r.fecha)} />
-          <Row label="Forma de pago" value={r.forma_pago ? FORMAS_PAGO[r.forma_pago] : undefined} />
-          {comprobante && <Row label={comprobante} value={r.nro_comprobante} />}
         </div>
         {r.observacion && (
           <div className="rounded-xl bg-muted px-4 py-3 text-sm">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">Observación</p>
             <p className="mt-1 whitespace-pre-line">{r.observacion}</p>
+          </div>
+        )}
+      </Card>
+
+      <Card className="space-y-5 p-6">
+        <Titulo
+          icon={<Wallet className="h-5 w-5" />}
+          texto="Formas de pago"
+          contador={r.pagos.length}
+        />
+        {r.pagos.length === 0 ? (
+          // Recibo anterior al 2026-10-19: la forma de pago estaba en una
+          // columna de la cabecera que se borró.
+          <p className="text-sm text-muted-foreground">
+            Sin registrar. El recibo se cargó antes de que las formas de pago se guardaran aparte.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/60 hover:bg-muted/60">
+                  <TableHead>Forma</TableHead>
+                  <TableHead>Nro.</TableHead>
+                  <TableHead>Emisión</TableHead>
+                  <TableHead>Vencimiento</TableHead>
+                  <TableHead className="text-right">Monto</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {r.pagos.map((p) => {
+                  const diferido = !!p.fecha_vencimiento && p.fecha_vencimiento > hoy;
+                  return (
+                    <TableRow key={p.id_pago}>
+                      <TableCell className="font-medium">{FORMAS_PAGO[p.forma_pago] ?? p.forma_pago}</TableCell>
+                      <TableCell className="whitespace-nowrap font-mono text-xs">
+                        {p.nro_documento || "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {p.fecha_emision ? fechaPy(p.fecha_emision) : "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {p.fecha_vencimiento ? (
+                          <span className="inline-flex items-center gap-2">
+                            {fechaPy(p.fecha_vencimiento)}
+                            {diferido && (
+                              <span className="rounded-full bg-warning/20 px-2 py-0.5 text-[11px] font-medium text-warning-foreground">
+                                Diferido
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-display font-semibold">
+                        {formatCurrency(p.monto)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
         )}
       </Card>
@@ -226,7 +293,12 @@ function ReciboProveedorPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <ArticulosFacturaDialog factura={verFactura} onClose={() => setVerFactura(null)} />
+      <ArticulosFacturaDialog
+        factura={verFactura}
+        onClose={() => setVerFactura(null)}
+        lista={r.facturas}
+        onCambiar={setVerFactura}
+      />
     </div>
   );
 }

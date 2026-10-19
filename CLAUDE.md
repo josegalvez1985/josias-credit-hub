@@ -20,9 +20,11 @@ abierta es el **módulo administrativo** (`/admin/*`, ERP), de escritorio:
   regeneran el plan de cuotas.
 - **Recibos de Proveedores**: el primero **con escritura** (`backend/proveedores.sql`). Valida
   token y lista de usuarios en Oracle en cada handler.
-- **Reportes**: Saldos de Proveedores, PDF A4, con tres alcances (solo saldo / con recibos /
-  todos). Sin módulo propio: usa los GET de `proveedores` (`facturas` y `pagos`).
-  Ver `GUIA-FRONTEND.md` §10.
+- **Reportes**: PDF A4 sobre `src/lib/reporte-a4.ts`. Sin módulo propio: usan los GET de
+  `proveedores`. Ver `GUIA-FRONTEND.md` §10.
+  - **Saldos de Proveedores**: tres alcances (solo saldo / con recibos / todos), con `facturas` y `pagos`.
+  - **Compras por Período**: facturas de compra contado y crédito entre dos fechas, con `compras`.
+    `TIPO = 'C'` con `MOTIVO` `'C'` (compra) o `'E'` (entrada), y **sin IVA**: la base no guarda la tasa.
 - **Definiciones**: ABM de tablas maestras (`backend/definiciones.sql`). Por ahora solo
   **Profesiones**. Las próximas se suman como template del mismo módulo y sección del mismo grupo.
 
@@ -58,6 +60,7 @@ o un listado, releer esta tabla.** El síntoma casi nunca apunta a la causa.
 | Una fecha se ve **un día antes** (29 en vez de 30), o "hoy" da mañana después de las 21:00 | `new Date("YYYY-MM-DD")` es medianoche **UTC** (en Paraguay, 21:00 del día anterior) y `toISOString()` da la fecha UTC. Pasó en 7 pantallas a la vez | Siempre `fechaPy()` / `fechaLocal()` / `hoyISO()` de `src/lib/utils.ts`. **Nunca** un `formatDate` local por pantalla |
 | Los recibos se emiten **sin interés por mora** (353 entre julio y octubre de 2026) y nada falla | `V_SALDOS` cuenta la mora con `TO_DATE(SYSDATE, 'DD/MM/YYYY')`, que **depende del `NLS_DATE_FORMAT` de la sesión**: anda en APEX y en ORDS da el año 0026. `RETORNA_INTERES` no encuentra tramo y devuelve 0 en silencio | No usar las columnas de mora o interés de `V_SALDOS`; calcular con `TRUNC(SYSDATE) - fec_vencimiento`. Nunca `TO_DATE` sobre algo que ya es fecha. `GUIA-BACKEND.md` §7 |
 | La búsqueda de un listado server-side no filtra nada | El parámetro se llamaba `q` (reservado de ORDS, ver primera fila). Pasó en `GET /recibos/` | Siempre `buscar` |
+| Una sección entera da 500 de un día para otro y nadie tocó el código | Se borró una columna en producción (`RECIBOS_COMPRA_CABECERA.FORMA_PAGO`, 2026-10-19) **antes** de redesplegar: el body del paquete quedó `INVALID` y los GET que la leían explotan | Cambio de esquema y redespliegue van **juntos**: primero el `.sql` nuevo listo, después el `DROP`, y enseguida paquete → 3.a → 3.b. Verificar con `SELECT status FROM user_objects` |
 | Un feed devuelve `items: []` sin ningún error | Se mandó `limit`/`offset` a un handler **`json/query`**, donde esos parámetros no existen. Solo los `plsql/block` los declaran como binds propios | `json/query` pagina con **`?page=N`** y avisa que hay más con un link `next` (no con `hasMore`). Ver `listarCreditos` en `api.ts` |
 
 **Y la regla que las engloba a todas:** cuando algo falla, **mirar cómo lo resuelve el código que ya

@@ -8,6 +8,7 @@ import {
   HandCoins,
   LayoutGrid,
   Receipt,
+  ShoppingCart,
   type LucideIcon,
 } from "lucide-react";
 import { useAdmin } from "@/lib/permisos";
@@ -82,6 +83,12 @@ export const GRUPOS_ADMIN: GrupoAdmin[] = [
         label: "Saldos de Proveedores",
         descripcion: "PDF de lo que se le debe a cada proveedor",
         icon: FileChartColumn,
+      },
+      {
+        to: "/admin/reportes/compras",
+        label: "Compras por Período",
+        descripcion: "PDF de las facturas de compra, contado y crédito, entre dos fechas",
+        icon: ShoppingCart,
       },
     ],
   },

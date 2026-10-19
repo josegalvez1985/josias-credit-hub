@@ -33,6 +33,7 @@ import { Route as AppClientesNuevoRouteImport } from './routes/_app.clientes.nue
 import { Route as AppAdminRecibosProveedoresIndexRouteImport } from './routes/_app.admin.recibos-proveedores.index'
 import { Route as AppAdminCreditosIndexRouteImport } from './routes/_app.admin.creditos.index'
 import { Route as AppAdminReportesSaldosProveedoresRouteImport } from './routes/_app.admin.reportes.saldos-proveedores'
+import { Route as AppAdminReportesComprasRouteImport } from './routes/_app.admin.reportes.compras'
 import { Route as AppAdminRecibosProveedoresNuevoRouteImport } from './routes/_app.admin.recibos-proveedores.nuevo'
 import { Route as AppAdminRecibosProveedoresIdRouteImport } from './routes/_app.admin.recibos-proveedores.$id'
 import { Route as AppAdminDefinicionesProfesionesRouteImport } from './routes/_app.admin.definiciones.profesiones'
@@ -161,6 +162,11 @@ const AppAdminReportesSaldosProveedoresRoute =
     path: '/reportes/saldos-proveedores',
     getParentRoute: () => AppAdminRoute,
   } as any)
+const AppAdminReportesComprasRoute = AppAdminReportesComprasRouteImport.update({
+  id: '/reportes/compras',
+  path: '/reportes/compras',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 const AppAdminRecibosProveedoresNuevoRoute =
   AppAdminRecibosProveedoresNuevoRouteImport.update({
     id: '/recibos-proveedores/nuevo',
@@ -210,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/admin/definiciones/profesiones': typeof AppAdminDefinicionesProfesionesRoute
   '/admin/recibos-proveedores/$id': typeof AppAdminRecibosProveedoresIdRoute
   '/admin/recibos-proveedores/nuevo': typeof AppAdminRecibosProveedoresNuevoRoute
+  '/admin/reportes/compras': typeof AppAdminReportesComprasRoute
   '/admin/reportes/saldos-proveedores': typeof AppAdminReportesSaldosProveedoresRoute
   '/admin/creditos/': typeof AppAdminCreditosIndexRoute
   '/admin/recibos-proveedores/': typeof AppAdminRecibosProveedoresIndexRoute
@@ -237,6 +244,7 @@ export interface FileRoutesByTo {
   '/admin/definiciones/profesiones': typeof AppAdminDefinicionesProfesionesRoute
   '/admin/recibos-proveedores/$id': typeof AppAdminRecibosProveedoresIdRoute
   '/admin/recibos-proveedores/nuevo': typeof AppAdminRecibosProveedoresNuevoRoute
+  '/admin/reportes/compras': typeof AppAdminReportesComprasRoute
   '/admin/reportes/saldos-proveedores': typeof AppAdminReportesSaldosProveedoresRoute
   '/admin/creditos': typeof AppAdminCreditosIndexRoute
   '/admin/recibos-proveedores': typeof AppAdminRecibosProveedoresIndexRoute
@@ -268,6 +276,7 @@ export interface FileRoutesById {
   '/_app/admin/definiciones/profesiones': typeof AppAdminDefinicionesProfesionesRoute
   '/_app/admin/recibos-proveedores/$id': typeof AppAdminRecibosProveedoresIdRoute
   '/_app/admin/recibos-proveedores/nuevo': typeof AppAdminRecibosProveedoresNuevoRoute
+  '/_app/admin/reportes/compras': typeof AppAdminReportesComprasRoute
   '/_app/admin/reportes/saldos-proveedores': typeof AppAdminReportesSaldosProveedoresRoute
   '/_app/admin/creditos/': typeof AppAdminCreditosIndexRoute
   '/_app/admin/recibos-proveedores/': typeof AppAdminRecibosProveedoresIndexRoute
@@ -299,6 +308,7 @@ export interface FileRouteTypes {
     | '/admin/definiciones/profesiones'
     | '/admin/recibos-proveedores/$id'
     | '/admin/recibos-proveedores/nuevo'
+    | '/admin/reportes/compras'
     | '/admin/reportes/saldos-proveedores'
     | '/admin/creditos/'
     | '/admin/recibos-proveedores/'
@@ -326,6 +336,7 @@ export interface FileRouteTypes {
     | '/admin/definiciones/profesiones'
     | '/admin/recibos-proveedores/$id'
     | '/admin/recibos-proveedores/nuevo'
+    | '/admin/reportes/compras'
     | '/admin/reportes/saldos-proveedores'
     | '/admin/creditos'
     | '/admin/recibos-proveedores'
@@ -356,6 +367,7 @@ export interface FileRouteTypes {
     | '/_app/admin/definiciones/profesiones'
     | '/_app/admin/recibos-proveedores/$id'
     | '/_app/admin/recibos-proveedores/nuevo'
+    | '/_app/admin/reportes/compras'
     | '/_app/admin/reportes/saldos-proveedores'
     | '/_app/admin/creditos/'
     | '/_app/admin/recibos-proveedores/'
@@ -538,6 +550,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminReportesSaldosProveedoresRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/admin/reportes/compras': {
+      id: '/_app/admin/reportes/compras'
+      path: '/reportes/compras'
+      fullPath: '/admin/reportes/compras'
+      preLoaderRoute: typeof AppAdminReportesComprasRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
     '/_app/admin/recibos-proveedores/nuevo': {
       id: '/_app/admin/recibos-proveedores/nuevo'
       path: '/recibos-proveedores/nuevo'
@@ -575,6 +594,7 @@ interface AppAdminRouteChildren {
   AppAdminDefinicionesProfesionesRoute: typeof AppAdminDefinicionesProfesionesRoute
   AppAdminRecibosProveedoresIdRoute: typeof AppAdminRecibosProveedoresIdRoute
   AppAdminRecibosProveedoresNuevoRoute: typeof AppAdminRecibosProveedoresNuevoRoute
+  AppAdminReportesComprasRoute: typeof AppAdminReportesComprasRoute
   AppAdminReportesSaldosProveedoresRoute: typeof AppAdminReportesSaldosProveedoresRoute
   AppAdminCreditosIndexRoute: typeof AppAdminCreditosIndexRoute
   AppAdminRecibosProveedoresIndexRoute: typeof AppAdminRecibosProveedoresIndexRoute
@@ -586,6 +606,7 @@ const AppAdminRouteChildren: AppAdminRouteChildren = {
   AppAdminDefinicionesProfesionesRoute: AppAdminDefinicionesProfesionesRoute,
   AppAdminRecibosProveedoresIdRoute: AppAdminRecibosProveedoresIdRoute,
   AppAdminRecibosProveedoresNuevoRoute: AppAdminRecibosProveedoresNuevoRoute,
+  AppAdminReportesComprasRoute: AppAdminReportesComprasRoute,
   AppAdminReportesSaldosProveedoresRoute:
     AppAdminReportesSaldosProveedoresRoute,
   AppAdminCreditosIndexRoute: AppAdminCreditosIndexRoute,
