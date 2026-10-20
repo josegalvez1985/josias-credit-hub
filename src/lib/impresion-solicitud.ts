@@ -135,13 +135,14 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
           )
           .join("");
 
-  // Datos laborales de los garantes (2026-10-19). No está en la página 57 de
-  // APEX: se agrega solo si algún garante los tiene, así un crédito aprobado
-  // antes sale igual que siempre.
+  // Datos laborales de los garantes (2026-10-19) y su domicilio (2026-10-20).
+  // No está en la página 57 de APEX: se agrega solo si algún garante los
+  // tiene, así un crédito aprobado antes sale igual que siempre.
   const garantes = d.referencias.filter(
     (r) =>
       r.ind_garante === "S" &&
       [
+        r.direccion_garante,
         r.es_empleado,
         r.antiguedad_anios,
         r.cod_profesion,
@@ -165,6 +166,9 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
           ${kv("¿Es empleado?", sn(r.es_empleado ?? undefined))}
         </div>
         <div class="cols">
+          <div class="ancho">${kv("Domicilio", r.direccion_garante)}</div>
+        </div>
+        <div class="cols">
           ${kv("Empresa", r.empresa_nombre)}
           ${kv("Cargo", r.puesto)}
           ${kv("Profesión", r.profesion)}
@@ -177,7 +181,7 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
         <div class="cols">
           ${kv("Teléfono", r.empresa_telefono)}
           ${kv("Ciudad", r.empresa_ciudad)}
-          ${kv("Dirección", r.empresa_calle_nro)}
+          ${kv("Dirección Empresa", r.empresa_calle_nro)}
         </div>
         ${
           r.posee_otros_ingresos === "S"
@@ -268,6 +272,8 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
   .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3mm 4mm; margin-bottom: 3mm; }
   .kv .k { font-size: 7.5pt; font-weight: bold; }
   .kv .v { font-size: 9pt; word-break: break-word; }
+  /* Un par que ocupa las tres columnas (el domicilio del garante es largo). */
+  .ancho { grid-column: 1 / -1; }
 
   /* Tablas */
   table { width: 100%; border-collapse: collapse; font-size: 8pt; }
@@ -395,7 +401,7 @@ function construirHtml(d: DatosSolicitud, logoUrl: string): string {
 ${
   bloquesGarante
     ? `
-  <h2 style="margin-top:6mm">Datos Laborales del Garante</h2>
+  <h2 style="margin-top:6mm">Datos del Garante</h2>
   ${bloquesGarante}`
     : ""
 }

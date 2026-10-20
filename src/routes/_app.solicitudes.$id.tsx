@@ -283,11 +283,13 @@ function SolicitudDetalle() {
   );
 }
 
-// Datos laborales del garante (2026-10-19). Las solicitudes anteriores no los
-// tienen: en ese caso no se dibuja nada en vez de once "—".
+// Datos laborales del garante (2026-10-19) y su dirección (2026-10-20). Las
+// solicitudes anteriores no los tienen: en ese caso no se dibuja nada en vez
+// de doce "—".
 function DatosGaranteView({ r, profesiones }: { r: ReferenciaRow; profesiones: Map<number, string> }) {
   const sn = (v?: string | null) => (v === "S" ? "Sí" : v === "N" ? "No" : undefined);
   const hayDatos = [
+    r.direccion_garante,
     r.es_empleado,
     r.antiguedad_anios,
     r.cod_profesion,
@@ -304,6 +306,7 @@ function DatosGaranteView({ r, profesiones }: { r: ReferenciaRow; profesiones: M
 
   return (
     <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 border-t border-border pt-3 sm:grid-cols-2">
+      <Row label="Dirección del garante" value={r.direccion_garante ?? undefined} />
       <Row
         label="Situación"
         value={r.es_empleado === "S" ? "Empleado" : r.es_empleado === "N" ? "Independiente" : undefined}

@@ -246,7 +246,8 @@ impide después cambiar los datos. **Una columna nueva en una tabla `SOLICITUD_V
 no llega al crédito si no se agrega también a la `VENTAS_*` y al `INSERT` del
 trigger.** El trigger está versionado en la sección 0 de
 [backend/solicitudes.sql](backend/solicitudes.sql) desde el 2026-10-19 (cédula y
-datos del garante en las referencias).
+datos del garante en las referencias; `DIRECCION_GARANTE` desde el 2026-10-20, que
+es el domicilio del codeudor en el pagaré).
 
 **Es de solo lectura a propósito, no por falta de tiempo.** Sobre
 `VENTAS_CABECERA` hay cinco triggers que regeneran el plan entero de

@@ -203,6 +203,9 @@ export type DatosGarante = {
   posee_otros_ingresos: string | null; // 'S' | 'N'
   conceptos: string | null; // solo si posee_otros_ingresos = 'S'
   aporta_ips: string | null; // 'S' | 'N'
+  // 2026-10-20: domicilio particular (no el de la empresa). Es el domicilio
+  // del codeudor en el pagaré.
+  direccion_garante: string | null;
 };
 
 export type ActividadInput = {

@@ -23,6 +23,12 @@
 --       CONCEPTOS            VARCHAR2(400)
 --       APORTA_IPS           VARCHAR2(1)    CHECK IN ('S','N')
 --     Todas opcionales. El paquete las deja NULL si la referencia no es garante.
+--   * 2026-10-20: + :direccion_garante (domicilio particular del garante, no
+--     el de su empresa). Jose agregó la columna a mano en las dos tablas:
+--       SOLICITUD_VENTAS_REFERENCIAS.DIRECCION_GARANTE  VARCHAR2(300)
+--       VENTAS_REFERENCIAS.DIRECCION_GARANTE            VARCHAR2(300)
+--     Misma regla que los datos laborales: solo se guarda si es garante. Es
+--     el domicilio del codeudor en el pagaré (src/lib/impresion-pagare.ts).
 --
 -- DESPLIEGUE: el trigger (sección 0) va solo, en su propia ejecución, y es
 -- independiente del resto. El módulo, igual que los demás (backend/README.md),
@@ -51,12 +57,12 @@
 -- (punto 3) copia también la cédula y los datos del garante. Antes copiaba
 -- solo relacion, telefono, nombre_apellido e ind_garante, y esos datos se
 -- quedaban en la solicitud. El resto está textual, incluidos los comentarios
--- repetidos del correlativo.
+-- repetidos del correlativo. El 2026-10-20 se sumó DIRECCION_GARANTE.
 --
 -- Requiere que las dos tablas ya tengan las columnas (en las dos ya están,
--- 2026-10-19). Si faltara alguna, el trigger compila INVALID y la próxima
--- aprobación falla con ORA-04098 — y en el celular el asesor no puede
--- aprobar nada.
+-- 2026-10-19; DIRECCION_GARANTE, 2026-10-20). Si faltara alguna, el trigger
+-- compila INVALID y la próxima aprobación falla con ORA-04098 — y en el
+-- celular el asesor no puede aprobar nada.
 --
 -- Después de correrlo:
 --   SELECT status FROM user_objects WHERE object_name = 'TRG_APROBAR_SOLICITUD';
@@ -114,17 +120,20 @@ FROM   ventas_cabecera;
 
   ----------------------------------------------------------------------------
   -- 3) REFERENCIAS   (2026-10-19: + cédula y datos laborales del garante)
+  --                  (2026-10-20: + dirección del garante)
   ----------------------------------------------------------------------------
     INSERT INTO ventas_referencias (
       id, relacion, telefono, nombre_apellido, ind_garante,
       nro_documento, es_empleado, antiguedad_anios, cod_profesion,
       empresa_nombre, empresa_telefono, empresa_ciudad, empresa_calle_nro,
-      puesto, ingresos_mensuales, posee_otros_ingresos, conceptos, aporta_ips
+      puesto, ingresos_mensuales, posee_otros_ingresos, conceptos, aporta_ips,
+      direccion_garante
     )
     SELECT l_ventas_id, r.relacion, r.telefono, r.nombre_apellido, r.ind_garante,
            r.nro_documento, r.es_empleado, r.antiguedad_anios, r.cod_profesion,
            r.empresa_nombre, r.empresa_telefono, r.empresa_ciudad, r.empresa_calle_nro,
-           r.puesto, r.ingresos_mensuales, r.posee_otros_ingresos, r.conceptos, r.aporta_ips
+           r.puesto, r.ingresos_mensuales, r.posee_otros_ingresos, r.conceptos, r.aporta_ips,
+           r.direccion_garante
     FROM   solicitud_ventas_referencias r
     WHERE  r.id = :NEW.id;
 
@@ -224,6 +233,9 @@ CREATE OR REPLACE PACKAGE pkg_solicitud_ventas AS
   -- garante: solo se guardan si p_ind_garante = 'S'; en una referencia común
   -- van NULL aunque lleguen. Todos opcionales (decisión de Jose) y con DEFAULT
   -- NULL, igual que p_ind_garante.
+  --
+  -- p_direccion_garante (2026-10-20): domicilio particular del garante. Va al
+  -- final para no correr la posición de los demás; misma regla (solo garante).
   FUNCTION ins_referencia(
     p_id                   NUMBER,
     p_relacion             VARCHAR2,
@@ -242,7 +254,8 @@ CREATE OR REPLACE PACKAGE pkg_solicitud_ventas AS
     p_ingresos_mensuales   NUMBER   DEFAULT NULL,
     p_posee_otros_ingresos VARCHAR2 DEFAULT NULL,
     p_conceptos            VARCHAR2 DEFAULT NULL,
-    p_aporta_ips           VARCHAR2 DEFAULT NULL
+    p_aporta_ips           VARCHAR2 DEFAULT NULL,
+    p_direccion_garante    VARCHAR2 DEFAULT NULL
   ) RETURN NUMBER;
 
   PROCEDURE upd_referencia(
@@ -263,7 +276,8 @@ CREATE OR REPLACE PACKAGE pkg_solicitud_ventas AS
     p_ingresos_mensuales   NUMBER   DEFAULT NULL,
     p_posee_otros_ingresos VARCHAR2 DEFAULT NULL,
     p_conceptos            VARCHAR2 DEFAULT NULL,
-    p_aporta_ips           VARCHAR2 DEFAULT NULL
+    p_aporta_ips           VARCHAR2 DEFAULT NULL,
+    p_direccion_garante    VARCHAR2 DEFAULT NULL
   );
 
   PROCEDURE del_referencia(p_id_detalle NUMBER);
@@ -335,7 +349,8 @@ CREATE OR REPLACE PACKAGE BODY pkg_solicitud_ventas AS
     ingresos_mensuales   NUMBER,
     posee_otros_ingresos VARCHAR2(1),
     conceptos            VARCHAR2(400),
-    aporta_ips           VARCHAR2(1)
+    aporta_ips           VARCHAR2(1),
+    direccion_garante    VARCHAR2(300)
   );
 
   --------------------------------------------------------------- CABECERA
@@ -487,7 +502,8 @@ CREATE OR REPLACE PACKAGE BODY pkg_solicitud_ventas AS
     p_ingresos_mensuales   NUMBER,
     p_posee_otros_ingresos VARCHAR2,
     p_conceptos            VARCHAR2,
-    p_aporta_ips           VARCHAR2
+    p_aporta_ips           VARCHAR2,
+    p_direccion_garante    VARCHAR2
   ) RETURN t_garante IS
     g t_garante;
   BEGIN
@@ -516,6 +532,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_solicitud_ventas AS
     g.posee_otros_ingresos := norm_sn(p_posee_otros_ingresos);
     g.conceptos            := CASE WHEN g.posee_otros_ingresos = 'S' THEN TRIM(p_conceptos) END;
     g.aporta_ips           := norm_sn(p_aporta_ips);
+    g.direccion_garante    := TRIM(p_direccion_garante);
     RETURN g;
   END datos_garante;
 
@@ -537,7 +554,8 @@ CREATE OR REPLACE PACKAGE BODY pkg_solicitud_ventas AS
     p_ingresos_mensuales   NUMBER   DEFAULT NULL,
     p_posee_otros_ingresos VARCHAR2 DEFAULT NULL,
     p_conceptos            VARCHAR2 DEFAULT NULL,
-    p_aporta_ips           VARCHAR2 DEFAULT NULL
+    p_aporta_ips           VARCHAR2 DEFAULT NULL,
+    p_direccion_garante    VARCHAR2 DEFAULT NULL
   ) RETURN NUMBER IS
     l_id_detalle NUMBER;
     -- norm_garante y datos_garante son privadas del body: no se pueden llamar
@@ -547,18 +565,18 @@ CREATE OR REPLACE PACKAGE BODY pkg_solicitud_ventas AS
                                   l_garante, p_es_empleado, p_antiguedad_anios, p_cod_profesion,
                                   p_empresa_nombre, p_empresa_telefono, p_empresa_ciudad,
                                   p_empresa_calle_nro, p_puesto, p_ingresos_mensuales,
-                                  p_posee_otros_ingresos, p_conceptos, p_aporta_ips);
+                                  p_posee_otros_ingresos, p_conceptos, p_aporta_ips, p_direccion_garante);
   BEGIN
     INSERT INTO solicitud_ventas_referencias (
       id, relacion, telefono, nombre_apellido, ind_garante, nro_documento,
       es_empleado, antiguedad_anios, cod_profesion, empresa_nombre, empresa_telefono,
       empresa_ciudad, empresa_calle_nro, puesto, ingresos_mensuales,
-      posee_otros_ingresos, conceptos, aporta_ips
+      posee_otros_ingresos, conceptos, aporta_ips, direccion_garante
     ) VALUES (
       p_id, p_relacion, p_telefono, p_nombre_apellido, l_garante, TRIM(p_nro_documento),
       g.es_empleado, g.antiguedad_anios, g.cod_profesion, g.empresa_nombre, g.empresa_telefono,
       g.empresa_ciudad, g.empresa_calle_nro, g.puesto, g.ingresos_mensuales,
-      g.posee_otros_ingresos, g.conceptos, g.aporta_ips
+      g.posee_otros_ingresos, g.conceptos, g.aporta_ips, g.direccion_garante
     ) RETURNING id_detalle INTO l_id_detalle;
     COMMIT;
     RETURN l_id_detalle;
@@ -582,14 +600,15 @@ CREATE OR REPLACE PACKAGE BODY pkg_solicitud_ventas AS
     p_ingresos_mensuales   NUMBER   DEFAULT NULL,
     p_posee_otros_ingresos VARCHAR2 DEFAULT NULL,
     p_conceptos            VARCHAR2 DEFAULT NULL,
-    p_aporta_ips           VARCHAR2 DEFAULT NULL
+    p_aporta_ips           VARCHAR2 DEFAULT NULL,
+    p_direccion_garante    VARCHAR2 DEFAULT NULL
   ) IS
     l_garante VARCHAR2(1) := norm_garante(p_ind_garante);
     g         t_garante   := datos_garante(
                                l_garante, p_es_empleado, p_antiguedad_anios, p_cod_profesion,
                                p_empresa_nombre, p_empresa_telefono, p_empresa_ciudad,
                                p_empresa_calle_nro, p_puesto, p_ingresos_mensuales,
-                               p_posee_otros_ingresos, p_conceptos, p_aporta_ips);
+                               p_posee_otros_ingresos, p_conceptos, p_aporta_ips, p_direccion_garante);
   BEGIN
     -- Si deja de ser garante, sus datos laborales se borran (g viene vacío).
     UPDATE solicitud_ventas_referencias SET
@@ -609,7 +628,8 @@ CREATE OR REPLACE PACKAGE BODY pkg_solicitud_ventas AS
       ingresos_mensuales   = g.ingresos_mensuales,
       posee_otros_ingresos = g.posee_otros_ingresos,
       conceptos            = g.conceptos,
-      aporta_ips           = g.aporta_ips
+      aporta_ips           = g.aporta_ips,
+      direccion_garante    = g.direccion_garante
     WHERE id_detalle = p_id_detalle;
     COMMIT;
   END upd_referencia;
@@ -1004,8 +1024,9 @@ END;');
       p_comments       => NULL);
 
   -- SELECT * ya incluye IND_GARANTE y las columnas del 2026-10-19 (cédula y
-  -- datos del garante); el frontend las lee en minúscula. La profesión del
-  -- garante se resuelve en el cliente con lovLabels("profesiones").
+  -- datos del garante) y DIRECCION_GARANTE (2026-10-20); el frontend las lee
+  -- en minúscula. La profesión del garante se resuelve en el cliente con
+  -- lovLabels("profesiones").
   ORDS.DEFINE_HANDLER(
       p_module_name    => 'solicitudes',
       p_pattern        => 'referencias/:id',
@@ -1037,7 +1058,8 @@ END;');
           p_empresa_calle_nro => :empresa_calle_nro, p_puesto => :puesto,
           p_ingresos_mensuales => :ingresos_mensuales,
           p_posee_otros_ingresos => :posee_otros_ingresos,
-          p_conceptos => :conceptos, p_aporta_ips => :aporta_ips);
+          p_conceptos => :conceptos, p_aporta_ips => :aporta_ips,
+          p_direccion_garante => :direccion_garante);
         :status_code := 201;
         htp.p(''{"success": true, "id_detalle": '' || l_idd || ''}'');
       EXCEPTION WHEN OTHERS THEN
@@ -1074,7 +1096,8 @@ END;');
           p_empresa_calle_nro => :empresa_calle_nro, p_puesto => :puesto,
           p_ingresos_mensuales => :ingresos_mensuales,
           p_posee_otros_ingresos => :posee_otros_ingresos,
-          p_conceptos => :conceptos, p_aporta_ips => :aporta_ips);
+          p_conceptos => :conceptos, p_aporta_ips => :aporta_ips,
+          p_direccion_garante => :direccion_garante);
         :status_code := 200;
         htp.p(''{"success": true}'');
       EXCEPTION WHEN OTHERS THEN

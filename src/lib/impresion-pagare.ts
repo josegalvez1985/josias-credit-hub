@@ -19,11 +19,16 @@
 //     usa el recibo térmico.
 //   - Los datos del codeudor (nombre, domicilio, cédula) iban SIEMPRE EN BLANCO:
 //     VENTAS_REFERENCIAS no guardaba la cédula del garante.
-//     (2026-10-19) Ahora la guarda (NRO_DOCUMENTO): si el crédito tiene UN solo
-//     garante, se imprimen su nombre y su cédula. Con varios garantes, o
-//     ninguno, sigue en blanco: cuál firma como codeudor se decide al firmar.
-//     El domicilio queda SIEMPRE en blanco: de la dirección del garante solo
-//     se guarda la de la empresa (EMPRESA_CALLE_NRO), no la de su casa.
+//     (2026-10-19) Ahora la guarda (NRO_DOCUMENTO): si el crédito tiene
+//     garante, se imprimen su nombre y su cédula en la segunda firma de los dos
+//     bloques (primero el titular, después el garante).
+//     (2026-10-20, pedido de Jose) Con varios garantes va el PRIMERO que se
+//     cargó en la solicitud (menor ID_DETALLE); antes salía en blanco. Sin
+//     garante, la columna sigue en blanco para completar a mano.
+//     (2026-10-20) El domicilio del codeudor es DIRECCION_GARANTE (la de su
+//     casa, no EMPRESA_CALLE_NRO). Si no se cargó, queda en blanco.
+//     Los créditos aprobados antes del 2026-10-19 traen el nombre pero no la
+//     cédula ni el domicilio: el trigger viejo no los copiaba.
 //   - (2026-08-08) El bloque del pagaré se llena A MANO al firmarlo: salen en
 //     blanco "Vencimiento:", "El día __ de ______", "Pagaré a: ______" y la
 //     fecha de emisión de "Capiatá __ de ______ de 20__". Del crédito solo se
@@ -66,8 +71,8 @@ function campo(label: string, valor: unknown, ancho = "auto"): string {
 // El par de firmas al pie de cada bloque. Va dos veces por bloque: izquierda
 // el deudor, derecha el codeudor.
 //
-// Del codeudor van nombre y cédula si hay un único garante; el domicilio,
-// siempre vacío (ver cabecera del archivo).
+// Del codeudor van nombre, domicilio y cédula del garante si lo hay (ver
+// cabecera del archivo).
 function firmas(nombre = "", domicilio = "", cedula = "", codeudor?: Codeudor): string {
   const col = (n: string, dom: string, ced: string) => `
     <div class="fcol">
@@ -80,19 +85,25 @@ function firmas(nombre = "", domicilio = "", cedula = "", codeudor?: Codeudor): 
   // Izquierda el titular con sus datos, derecha el codeudor.
   return `<div class="firmas">${col(nombre, domicilio, cedula)}${col(
     codeudor?.nombre ?? "",
-    "",
+    codeudor?.domicilio ?? "",
     codeudor?.cedula ?? "",
   )}</div>`;
 }
 
-export type Codeudor = { nombre: string; cedula: string };
+export type Codeudor = { nombre: string; domicilio: string; cedula: string };
 
-// El codeudor del pagaré: el garante del crédito, solo si hay exactamente uno.
+// El codeudor del pagaré: el garante del crédito y, si hay varios, el primero
+// que se cargó. No se confía en el orden del endpoint: se ordena acá.
 export function codeudorDe(referencias: CreditoReferencia[]): Codeudor | undefined {
-  const garantes = referencias.filter((r) => r.ind_garante === "S");
-  if (garantes.length !== 1) return undefined;
-  const g = garantes[0];
-  return { nombre: g.nombre_apellido ?? "", cedula: g.nro_documento ?? "" };
+  const g = referencias
+    .filter((r) => r.ind_garante === "S")
+    .sort((a, b) => a.id_detalle - b.id_detalle)[0];
+  if (!g) return undefined;
+  return {
+    nombre: g.nombre_apellido ?? "",
+    domicilio: g.direccion_garante ?? "",
+    cedula: g.nro_documento ?? "",
+  };
 }
 
 function construirHtml(c: CreditoCabecera, codeudor?: Codeudor): string {

@@ -93,8 +93,8 @@ function CreditoDetallePage() {
   }
 
   // El pagaré sale de la cabecera (monto, monto en letras, % de interés y los
-  // datos del titular) y, desde el 2026-10-19, del garante como codeudor si
-  // hay uno solo (codeudorDe).
+  // datos del titular) y, desde el 2026-10-19, del garante como codeudor
+  // (codeudorDe: con varios, el primero).
   function imprimirElPagare() {
     try {
       imprimirPagare(c, codeudorDe(referencias));
@@ -293,6 +293,7 @@ function CreditoDetallePage() {
               )}
             </p>
             <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Row label="Dirección" value={r.direccion_garante ?? undefined} />
               <Row
                 label="Situación"
                 value={r.es_empleado === "S" ? "Empleado" : r.es_empleado === "N" ? "Independiente" : undefined}
@@ -420,10 +421,11 @@ function Row({ label, value }: { label: string; value?: string | number | null }
   );
 }
 
-// Garante con al menos un dato laboral cargado.
+// Garante con al menos un dato cargado (laboral o su dirección).
 function tieneDatosGarante(r: CreditoReferencia): boolean {
   if (r.ind_garante !== "S") return false;
   return [
+    r.direccion_garante,
     r.es_empleado,
     r.antiguedad_anios,
     r.cod_profesion,

@@ -177,6 +177,7 @@ function NewApplication() {
     posee_otros_ingresos: "N",
     conceptos: "",
     aporta_ips: "N",
+    direccion_garante: "",
   };
   const [gar, setGar] = useState(GAR_VACIO);
   const [garProfesion, setGarProfesion] = useState<{ value: number; label: string } | null>(null);
@@ -310,6 +311,7 @@ function NewApplication() {
             posee_otros_ingresos: gar.posee_otros_ingresos,
             conceptos: gar.posee_otros_ingresos === "S" ? txt(gar.conceptos) : null,
             aporta_ips: gar.aporta_ips,
+            direccion_garante: txt(gar.direccion_garante),
           }
         : {
             es_empleado: null,
@@ -324,6 +326,7 @@ function NewApplication() {
             posee_otros_ingresos: null,
             conceptos: null,
             aporta_ips: null,
+            direccion_garante: null,
           };
     setReferencias((r) => [
       ...r,
@@ -837,9 +840,21 @@ function NewApplication() {
               {refRow.ind_garante === "S" && (
                 <div className="mt-3 space-y-4 rounded-xl border border-border p-4">
                   <div>
-                    <p className="font-medium">Datos laborales del garante</p>
+                    <p className="font-medium">Datos del garante</p>
                     <p className="text-xs text-muted-foreground">Todos opcionales.</p>
                   </div>
+
+                  {/* Domicilio particular: es el del codeudor en el pagaré. */}
+                  <Field label="Dirección del garante">
+                    <Input
+                      maxLength={300}
+                      value={gar.direccion_garante}
+                      onChange={(e) => setGar((g) => ({ ...g, direccion_garante: e.target.value }))}
+                      placeholder="Calle, número, barrio y ciudad"
+                    />
+                  </Field>
+
+                  <p className="text-sm font-medium">Datos laborales</p>
 
                   {/* Tocar la opción elegida la desmarca: "sin dato" es válido. */}
                   <div className="flex gap-2">

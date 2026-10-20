@@ -50,9 +50,13 @@ export function AsyncCombobox({
 
   // Se ofrece crear solo si hay texto y ninguna fila se llama exactamente así
   // (sin distinguir mayúsculas ni espacios de más, como compara Oracle).
+  //
+  // El label puede llegar NULL aunque el tipo diga string: es la descripción
+  // de la tabla y la base la admite vacía. Sin el `?? ""` tumba la pantalla
+  // entera ("Cannot read properties of null (reading 'trim')").
   const texto = query.trim().replace(/\s+/g, " ");
   const yaExiste = items.some(
-    (i) => i.label.trim().replace(/\s+/g, " ").toLowerCase() === texto.toLowerCase(),
+    (i) => (i.label ?? "").trim().replace(/\s+/g, " ").toLowerCase() === texto.toLowerCase(),
   );
   const puedeCrear = !!onCreate && !!texto && !loading && !yaExiste;
 
@@ -145,7 +149,9 @@ export function AsyncCombobox({
                       )}
                     >
                       <Check className={cn("mt-0.5 h-4 w-4 shrink-0", value === item.value ? "opacity-100" : "opacity-0")} />
-                      <span className="min-w-0 flex-1">{renderItem ? renderItem(item) : item.label}</span>
+                      <span className="min-w-0 flex-1">
+                        {renderItem ? renderItem(item) : (item.label ?? `Sin descripción (${item.value})`)}
+                      </span>
                     </button>
                   </li>
                 ))}

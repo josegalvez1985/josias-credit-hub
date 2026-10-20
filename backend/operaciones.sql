@@ -1,7 +1,8 @@
 -- =====================================================================
 -- ENDPOINT: /operaciones  —  "Solicitud de Créditos" (Créditos Otorgados)
 -- Contiene: solo el módulo ORDS. Sin paquete y sin DDL: es de lectura pura
--- (el ALTER de VENTAS_REFERENCIAS de la sección 1.a ya está aplicado).
+-- (los ALTER de VENTAS_REFERENCIAS de las secciones 1.a y 1.b ya están
+-- aplicados).
 -- Correr como WKSP_JOSIASMUEBLES.
 --
 -- Migra la página 18 de la app APEX 70967 ("Facturas" / Créditos Otorgados),
@@ -91,6 +92,17 @@
 --     empresa_nombre, empresa_telefono, empresa_ciudad, empresa_calle_nro,
 --     puesto, ingresos_mensuales, posee_otros_ingresos, conceptos, aporta_ips
 --   );
+--
+-- 1.b  Dirección del garante en VENTAS_REFERENCIAS (2026-10-20)  [YA APLICADO]
+-- ---------------------------------------------------------------------
+-- Jose la agregó a mano, igual que en SOLICITUD_VENTAS_REFERENCIAS:
+--
+--   DIRECCION_GARANTE    VARCHAR2(300)  -- domicilio particular, admite NULL
+--
+-- La copia TRG_APROBAR_SOLICITUD (backend/solicitudes.sql, sección 0) y es el
+-- domicilio del codeudor en el pagaré. Rollback (antes, el trigger sin ella):
+--
+--   ALTER TABLE ventas_referencias DROP COLUMN direccion_garante;
 
 
 -- =====================================================================
@@ -423,7 +435,8 @@ BEGIN
   --
   -- Desde el 2026-10-19 trae también la cédula (cualquier referencia) y los
   -- datos laborales del garante (ver 1.a), con la profesión ya resuelta. Los
-  -- créditos aprobados antes los tienen en NULL.
+  -- créditos aprobados antes los tienen en NULL. DIRECCION_GARANTE (1.b),
+  -- desde el 2026-10-20.
   ORDS.DEFINE_TEMPLATE(
       p_module_name    => 'operaciones',
       p_pattern        => 'credito/:id/referencias',
@@ -460,7 +473,8 @@ BEGIN
              vr.ingresos_mensuales,
              vr.posee_otros_ingresos,
              vr.conceptos,
-             vr.aporta_ips
+             vr.aporta_ips,
+             vr.direccion_garante
       FROM   ventas_referencias vr
       LEFT   JOIN relaciones_personales rp
              ON  TO_CHAR(rp.cod_relacion) = TRIM(vr.relacion)
