@@ -20,13 +20,19 @@ abierta es el **módulo administrativo** (`/admin/*`, ERP), de escritorio:
   regeneran el plan de cuotas.
 - **Recibos de Proveedores**: el primero **con escritura** (`backend/proveedores.sql`). Valida
   token y lista de usuarios en Oracle en cada handler.
-- **Reportes**: PDF A4 sobre `src/lib/reporte-a4.ts`. Sin módulo propio: usan los GET de
-  `proveedores`. Ver `GUIA-FRONTEND.md` §10.
+- **Reportes**: PDF A4 sobre `src/lib/reporte-a4.ts`. Los de proveedores usan los GET de
+  `proveedores`; los demás, su propio módulo. Ver `GUIA-FRONTEND.md` §10.
   - **Saldos de Proveedores**: tres alcances (solo saldo / con recibos / todos), con `facturas` y `pagos`.
   - **Compras por Período**: facturas de compra contado y crédito entre dos fechas, con `compras`.
     `TIPO = 'C'` con `MOTIVO` `'C'` (compra) o `'E'` (entrada), y **sin IVA**: la base no guarda la tasa.
   - **Cheques a Vencer**: cheques entregados a proveedores, agrupados por día de vencimiento, con
     `cheques`. La base **no registra si un cheque se cobró**: vencido = "ya se pudo cobrar".
+  - **Margen de Ventas por Artículos** (pág. 61 de APEX): módulo propio, `backend/margen-articulos.sql`.
+    Costo = última compra real hasta el fin del período; sin compra → "Sin costo", fuera de la
+    ganancia. Margen sobre el costo.
+  - **Regla para reportes nuevos: un archivo y un módulo ORDS por reporte, con el nombre de su ruta**
+    (`/admin/reportes/<nombre>` → `backend/<nombre>.sql` → módulo `<nombre>`). Nunca un módulo
+    `reportes` compartido: el `DELETE_MODULE` de uno borraría los otros.
 - **Definiciones**: ABM de tablas maestras (`backend/definiciones.sql`). Por ahora solo
   **Profesiones**. Las próximas se suman como template del mismo módulo y sección del mismo grupo.
 

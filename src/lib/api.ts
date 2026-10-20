@@ -1186,6 +1186,35 @@ export function listarChequesProveedor(f: { desde: string; hasta: string; codPro
   );
 }
 
+// Una fila del reporte Margen de Ventas por Articulos (backend/margen-articulos.sql):
+// un articulo vendido en UN plan de cuotas. El plan es el de la solicitud
+// entera, no el del articulo. La pantalla junta las filas de un articulo con
+// agruparMargen (src/lib/reporte-margen.ts).
+export type MargenPlan = {
+  cod_articulo: number;
+  articulo?: string; // ausente si el codigo no esta en ARTICULOS (el detalle no tiene FK)
+  cantidad_cuotas?: number;
+  monto_cuota?: number;
+  entrega_inicial?: number;
+  solicitudes: number; // solicitudes aprobadas con este articulo en este plan
+  cantidad: number; // unidades
+  total_venta: number; // precio a credito (con interes) x cantidad
+  // Ultima compra real (TIPO 'C', precio > 0) hasta el `hasta` del periodo.
+  // null si no hay: el articulo sale "Sin costo".
+  costo: number | null;
+  fecha_costo: string | null; // YYYY-MM-DD de esa compra
+};
+
+// Ventas de solicitudes APROBADAS con FECHA_FACTURA entre `desde` y `hasta`
+// (YYYY-MM-DD, los dos incluidos), sin el articulo 217. Solo para usuarios
+// del modulo administrativo: Oracle valida el token y la lista.
+export function listarMargenArticulos(f: { desde: string; hasta: string }) {
+  const qs = new URLSearchParams({ desde: f.desde, hasta: f.hasta });
+  return request<{ items: MargenPlan[] }>(`/margen-articulos/ventas?${qs}`).then(
+    (r) => r.items ?? [],
+  );
+}
+
 // Solo proveedores con alguna factura a credito. La busqueda va en el cliente.
 export async function lovProveedores(q?: string): Promise<ProveedorLov[]> {
   const r = await request<{ items: ProveedorLov[] }>("/proveedores/lov/proveedores");

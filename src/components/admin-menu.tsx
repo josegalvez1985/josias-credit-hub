@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   Receipt,
   ShoppingCart,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import { useAdmin } from "@/lib/permisos";
@@ -96,6 +97,12 @@ export const GRUPOS_ADMIN: GrupoAdmin[] = [
         label: "Cheques a Vencer",
         descripcion: "PDF de los cheques a proveedores por fecha de vencimiento",
         icon: CalendarClock,
+      },
+      {
+        to: "/admin/reportes/margen-articulos",
+        label: "Margen de Ventas por Artículos",
+        descripcion: "Ganancia y margen de cada artículo vendido a crédito, entre dos fechas",
+        icon: TrendingUp,
       },
     ],
   },

@@ -232,6 +232,48 @@ Lo que no es obvio:
   usan, y el LOV del asesor (`/solicitudes/lov/profesiones`) la ve al instante.
 - El código lo pone el trigger `BI_PROFESIONES` (`PROFESIONES_SEQ`).
 
+### Reportes de gestión — Margen de Ventas por Artículos (2026-10-20)
+
+Migra la página 61 de APEX, en
+[backend/margen-articulos.sql](backend/margen-articulos.sql), módulo ORDS
+`margen-articulos` (`/margen-articulos/`).
+
+**Regla desde acá: un archivo y un módulo por reporte, con el nombre del
+reporte** (el de su ruta en el menú: `/admin/reportes/<nombre>` →
+`backend/<nombre>.sql` → módulo `<nombre>`). No se juntan en un módulo
+`reportes`: cada archivo arranca con `DELETE_MODULE`, y desplegar uno borraría
+los handlers de los otros. Saldos, Compras y Cheques quedaron dentro de
+`proveedores` porque son anteriores a la regla.
+
+| Pieza | Estado |
+| --- | --- |
+| `backend/margen-articulos.sql` | ⏳ **Falta desplegar**: sin paquete, son **dos** ejecuciones (2.a sola, verificar conteo 0 → 2.b). Antes, confirmar que no exista otro módulo `margen-articulos` |
+| Cliente HTTP | ✅ hecho — `listarMargenArticulos` (`GET /margen-articulos/ventas?desde=&hasta=`) |
+| Pantalla y PDF | ✅ hechos — [\_app.admin.reportes.margen-articulos.tsx](src/routes/_app.admin.reportes.margen-articulos.tsx) + [reporte-margen.ts](src/lib/reporte-margen.ts) |
+
+Lo que no es obvio (decisiones de Jose; el detalle, en la cabecera del handler):
+
+- **El endpoint devuelve una fila por artículo y plan de cuotas**; la pantalla
+  las junta por artículo (`agruparMargen`). APEX mostraba esas filas sueltas y
+  un mismo artículo salía repetido. **El plan es el de la solicitud entera**:
+  la cuota de una solicitud con tres artículos es la de los tres.
+- **Ganancia y márgenes se calculan en el cliente**, en `reporte-margen.ts`,
+  para que pantalla y PDF usen la misma fórmula. El margen principal es
+  **sobre el costo**, como APEX; sobre la venta va de dato secundario.
+- **Costo = última compra real hasta el fin del período**: `TIPO = 'C'`, precio
+  > 0, la de fecha mayor (y `ID_DETALLE` mayor si empatan). APEX tomaba la
+  última fila de `COMPRAS_DETALLE` de cualquier tipo y fecha: un movimiento de
+  inventario o una compra posterior cambiaban el margen de ventas ya hechas.
+- **Sin compra, `costo` es `null`, no 0**: el artículo sale "Sin costo" y queda
+  fuera del costo, la ganancia y el margen. Con 0, APEX lo mostraba con
+  ganancia igual a todo lo vendido.
+- **El precio de venta es el de la solicitud, a crédito y con interés**: la
+  ganancia incluye la financiación y todavía no está cobrada.
+- **`SOLICITUD_VENTAS_DETALLE.COD_ARTICULO` no tiene FK**: se une a `ARTICULOS`
+  con `LEFT JOIN` para no perder ventas (APEX las perdía en el `INNER JOIN`).
+- El artículo **217** queda afuera, como en APEX.
+- `FECHA_FACTURA` es `DATE`: se filtra con `< hasta + 1`, no con `BETWEEN`.
+
 ### Tres cosas que no hay que perder de vista
 
 **`VENTAS_*` no es `SOLICITUD_VENTAS_*`.** Son tablas distintas: las
@@ -260,8 +302,9 @@ cabecera de `backend/operaciones.sql`.
 que edite el bundle hace aparecer el menú. La seguridad está del lado de
 Oracle: todo módulo administrativo con escritura valida en cada handler, contra
 el token, que el usuario esté en la lista. `proveedores` ya lo hace y es la
-referencia (`l_guardia` en `backend/proveedores.sql`); `operaciones`, que es de
-solo lectura, todavía no.
+referencia (`l_guardia` en `backend/proveedores.sql`); `definiciones` y
+`margen-articulos` lo copian (este último aunque es de solo lectura: costos y
+márgenes son sensibles). `operaciones` todavía no.
 
 ### La paginación de `operaciones` no es la de `recibos`
 

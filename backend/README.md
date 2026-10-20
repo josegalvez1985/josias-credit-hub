@@ -20,6 +20,15 @@ Todo lo que necesita ese endpoint está en su archivo, no hay que saltar entre c
 | `operaciones.sql` | `/operaciones/*` | módulo ORDS `operaciones` — créditos otorgados (pág. 18 de APEX). **Solo lectura y sin paquete**: SQL puro. Alimenta el módulo administrativo |
 | `proveedores.sql` | `/proveedores/*` | `pkg_recibos_compra` + módulo ORDS `proveedores` — recibos de pago a proveedores por facturas de compra a crédito. Primer módulo administrativo **con escritura**: valida token y lista de usuarios en cada handler |
 | `definiciones.sql` | `/definiciones/*` | `pkg_definiciones` + módulo ORDS `definiciones` — ABM de tablas maestras del módulo administrativo (por ahora `PROFESIONES`). Misma guardia que `proveedores` |
+| `margen-articulos.sql` | `/margen-articulos/*` | módulo ORDS `margen-articulos` — reporte Margen de Ventas por Artículos (pág. 61 de APEX). **Solo lectura y sin paquete**, con la misma guardia que `proveedores` |
+
+**Los reportes van uno por archivo y uno por módulo**, con el nombre de su ruta
+en el menú: `/admin/reportes/<nombre>` → `backend/<nombre>.sql` → módulo
+`<nombre>`. Nunca un módulo `reportes` compartido: cada archivo arranca con
+`ORDS.DELETE_MODULE`, y desplegar un reporte borraría los handlers de los
+demás. (Saldos, Compras y Cheques viven en `proveedores` porque son anteriores
+a esta regla.) Sin paquete, el despliegue es en **dos** ejecuciones: el
+`DELETE_MODULE` solo y después la definición.
 
 **Todo lo de un módulo va en su archivo**, incluidos los cambios de esquema.
 No hay carpeta `migrations/`: los `ALTER`/`DROP` van en una sección de saneamiento
@@ -187,7 +196,7 @@ En orden, hasta que uno funcione:
   vive también en el paquete y en `src/lib/permisos.ts`: los tres tienen que
   coincidir. "Sin permiso" responde **400, no 403**, porque `api.ts` toma el
   403 como sesión vencida y expulsa al login. Referencia: `l_guardia` en
-  `proveedores.sql`.
+  `proveedores.sql` (copiado en `definiciones.sql` y `margen-articulos.sql`).
 - **Un `DELETE` no lleva `Content-Type: application/json`.** Con ese header ORDS
   intenta parsear el cuerpo antes del handler, el cuerpo no le llega y corta con
   *"Expected one of: <<{,[,…>> but got: <<EOF>>"* sin ejecutar nada. El cliente

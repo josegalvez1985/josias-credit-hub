@@ -170,6 +170,7 @@ solo por unas pocas personas, y ahí las reglas cambian a propósito.
   | Alta con escritura: cabecera + tabla de filas elegibles con monto | `_app.admin.recibos-proveedores.nuevo.tsx` |
   | Detalle con borrado detrás de un `AlertDialog` | `_app.admin.recibos-proveedores.$id.tsx` |
   | Reporte: opciones + vista previa + PDF | `_app.admin.reportes.saldos-proveedores.tsx` |
+  | Reporte analítico: indicadores + tabla ordenable con filas desplegables + PDF | `_app.admin.reportes.margen-articulos.tsx` |
   | ABM de tabla maestra: tabla + `Dialog` de alta/edición + `AlertDialog` de baja | `_app.admin.definiciones.profesiones.tsx` |
 
 Quién lo ve lo decide [src/lib/permisos.ts](src/lib/permisos.ts): lista blanca de
@@ -336,6 +337,7 @@ documentos en hoja (logo, tabla con encabezado oscuro, `@page { margin: 0 }`,
 | Saldos de Proveedores | [reporte-saldos-proveedores.ts](src/lib/reporte-saldos-proveedores.ts) | Administración → Reportes |
 | Compras por Período | [reporte-compras.ts](src/lib/reporte-compras.ts) | Administración → Reportes |
 | Cheques a Vencer | [reporte-cheques.ts](src/lib/reporte-cheques.ts) | Administración → Reportes |
+| Margen de Ventas por Artículos | [reporte-margen.ts](src/lib/reporte-margen.ts) | Administración → Reportes |
 
 Lo común (estilo, encabezado, pie, márgenes y la apertura de la pestaña) vive
 en [reporte-a4.ts](src/lib/reporte-a4.ts): un reporte nuevo arma su cuerpo y
@@ -355,6 +357,14 @@ Saldos de Proveedores tiene tres alcances: **Solo saldo** (facturas con saldo),
 **Con recibos** (esas, con los recibos debajo de cada una) y **Todos** (también
 las canceladas: el estado de cuenta). Los recibos salen de `GET /proveedores/pagos`
 y solo van en el detalle, por eso "Con recibos" deja el detalle fijo.
+
+Margen de Ventas por Artículos es el primero **analítico**: arriba cinco
+indicadores (vendido, costo, ganancia, margen, unidades), un aviso con los
+artículos **sin costo** (no entran en la ganancia), y una tabla por artículo
+con columnas ordenables, buscador y filas que se despliegan en los planes de
+cuotas en que se vendió. Agrupar, totalizar, ordenar y calcular márgenes vive
+en `reporte-margen.ts` y lo usan la pantalla y el PDF: **una sola fórmula**.
+Los indicadores son del período entero; el pie de la tabla, de lo que se ve.
 
 Detalle de las vías del ticket y del error de Windows con la térmica USB en
 [GUIA-IMPRESION-USB.md](GUIA-IMPRESION-USB.md).
