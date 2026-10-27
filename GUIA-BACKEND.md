@@ -274,6 +274,33 @@ Lo que no es obvio (decisiones de Jose; el detalle, en la cabecera del handler):
 - El artículo **217** queda afuera, como en APEX.
 - `FECHA_FACTURA` es `DATE`: se filtra con `< hasta + 1`, no con `BETWEEN`.
 
+### Reportes de gestión — Ventas vs Pagos (2026-10-27)
+
+Reporte nuevo, sin página de APEX. [backend/ventas-pagos.sql](backend/ventas-pagos.sql),
+módulo ORDS `ventas-pagos` (`GET /ventas-pagos/resumen?desde=&hasta=`).
+
+| Pieza | Estado |
+| --- | --- |
+| `backend/ventas-pagos.sql` | ⏳ **Falta desplegar**: sin paquete, son **dos** ejecuciones (2.a sola, verificar conteo 0 → 2.b). Antes, confirmar que no exista otro módulo `ventas-pagos` |
+| Cliente HTTP | ✅ hecho — `resumenVentasPagos` |
+| Pantalla y PDF | ✅ hechos — [\_app.admin.reportes.ventas-pagos.tsx](src/routes/_app.admin.reportes.ventas-pagos.tsx) + [reporte-ventas-pagos.ts](src/lib/reporte-ventas-pagos.ts) |
+
+Decisiones de Jose:
+
+- **Solo un total general del período**, sin detalle por día ni por proveedor.
+- **Ventas = créditos otorgados** (`VENTAS_CABECERA`, no `SOLICITUD_VENTAS_*`)
+  por `FECHA_FACTURA`. Monto = `TOTAL`: precio a crédito, con interés y
+  entrega inicial. **No es lo cobrado.** La tabla no tiene estado ni anulación.
+- **Pagos = pagos a proveedores**: recibos por la **fecha del recibo** (los
+  cheques diferidos también, no en su vencimiento) + compras al contado, con
+  el mismo filtro que Compras por Período (`TIPO 'C'`, `MOTIVO 'C'/'E'`,
+  `CONDICION_COMPRA <> 2`) para que los dos reportes cuadren.
+- El desglose por forma sale de `RECIBOS_COMPRA_PAGOS`: lo que no cierra contra
+  `MONTO_TOTAL` (recibos viejos, sin la 1.b de `proveedores.sql`) se muestra
+  como "Sin forma de pago registrada" y entra en el total igual.
+- Diferencia = ventas − pagos.
+- No depende de `pkg_recibos_compra`: anda aunque `proveedores` esté caído.
+
 ### Tres cosas que no hay que perder de vista
 
 **`VENTAS_*` no es `SOLICITUD_VENTAS_*`.** Son tablas distintas: las

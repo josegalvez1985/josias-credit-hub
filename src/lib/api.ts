@@ -1215,6 +1215,33 @@ export function listarMargenArticulos(f: { desde: string; hasta: string }) {
   );
 }
 
+// Reporte Ventas vs Pagos (backend/ventas-pagos.sql): totales del periodo.
+// Ventas = creditos otorgados (VENTAS_CABECERA) por FECHA_FACTURA, a precio
+// de credito. Pagos a proveedores = recibos por su fecha (los cheques
+// diferidos tambien) + compras al contado. Las cuentas derivadas (total
+// pagado, sin registrar, diferencia) estan en src/lib/reporte-ventas-pagos.ts.
+export type VentasPagos = {
+  ventas: { cantidad: number; total: number; entrega_inicial: number };
+  // El desglose sale de RECIBOS_COMPRA_PAGOS: los recibos viejos sin formas
+  // cargadas hacen que sume menos que `total`.
+  recibos: {
+    cantidad: number;
+    total: number;
+    efectivo: number;
+    transferencia: number;
+    cheque: number;
+  };
+  contado: { cantidad: number; total: number };
+};
+
+// Devuelve un objeto, no un feed: no hay `items` ni paginacion. `desde` y
+// `hasta` son YYYY-MM-DD, los dos incluidos. Solo usuarios del modulo
+// administrativo: Oracle valida el token y la lista.
+export function resumenVentasPagos(f: { desde: string; hasta: string }) {
+  const qs = new URLSearchParams({ desde: f.desde, hasta: f.hasta });
+  return request<VentasPagos>(`/ventas-pagos/resumen?${qs}`);
+}
+
 // Solo proveedores con alguna factura a credito. La busqueda va en el cliente.
 export async function lovProveedores(q?: string): Promise<ProveedorLov[]> {
   const r = await request<{ items: ProveedorLov[] }>("/proveedores/lov/proveedores");

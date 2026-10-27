@@ -25,9 +25,10 @@ import { useAuth } from "./auth";
 //
 // ⚠ La misma lista está en backend/proveedores.sql (pkg_recibos_compra.es_admin
 // y l_admins del módulo), en backend/definiciones.sql (pkg_definiciones.es_admin
-// y l_admins) y en backend/margen-articulos.sql (l_admins). Un usuario agregado
-// solo acá ve el menú pero Oracle le rechaza cada pedido de Recibos de
-// Proveedores, de Definiciones y del reporte de margen.
+// y l_admins), en backend/margen-articulos.sql y en backend/ventas-pagos.sql
+// (l_admins). Un usuario agregado solo acá ve el menú pero Oracle le rechaza
+// cada pedido de Recibos de Proveedores, de Definiciones y de los reportes de
+// margen y de ventas vs pagos.
 const USUARIOS_ADMIN = ["AAQUINO", "AGONZALEZ", "JOSEG"] as const;
 
 export function esUsuarioAdmin(username?: string | null): boolean {

@@ -21,6 +21,7 @@ Todo lo que necesita ese endpoint está en su archivo, no hay que saltar entre c
 | `proveedores.sql` | `/proveedores/*` | `pkg_recibos_compra` + módulo ORDS `proveedores` — recibos de pago a proveedores por facturas de compra a crédito. Primer módulo administrativo **con escritura**: valida token y lista de usuarios en cada handler |
 | `definiciones.sql` | `/definiciones/*` | `pkg_definiciones` + módulo ORDS `definiciones` — ABM de tablas maestras del módulo administrativo (por ahora `PROFESIONES`). Misma guardia que `proveedores` |
 | `margen-articulos.sql` | `/margen-articulos/*` | módulo ORDS `margen-articulos` — reporte Margen de Ventas por Artículos (pág. 61 de APEX). **Solo lectura y sin paquete**, con la misma guardia que `proveedores` |
+| `ventas-pagos.sql` | `/ventas-pagos/*` | módulo ORDS `ventas-pagos` — reporte Ventas vs Pagos (créditos otorgados contra pagos a proveedores). **Solo lectura y sin paquete**, misma guardia. Devuelve un objeto, no un feed |
 
 **Los reportes van uno por archivo y uno por módulo**, con el nombre de su ruta
 en el menú: `/admin/reportes/<nombre>` → `backend/<nombre>.sql` → módulo
@@ -196,7 +197,8 @@ En orden, hasta que uno funcione:
   vive también en el paquete y en `src/lib/permisos.ts`: los tres tienen que
   coincidir. "Sin permiso" responde **400, no 403**, porque `api.ts` toma el
   403 como sesión vencida y expulsa al login. Referencia: `l_guardia` en
-  `proveedores.sql` (copiado en `definiciones.sql` y `margen-articulos.sql`).
+  `proveedores.sql` (copiado en `definiciones.sql`, `margen-articulos.sql` y
+  `ventas-pagos.sql`).
 - **Un `DELETE` no lleva `Content-Type: application/json`.** Con ese header ORDS
   intenta parsear el cuerpo antes del handler, el cuerpo no le llega y corta con
   *"Expected one of: <<{,[,…>> but got: <<EOF>>"* sin ejecutar nada. El cliente

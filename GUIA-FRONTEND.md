@@ -338,6 +338,7 @@ documentos en hoja (logo, tabla con encabezado oscuro, `@page { margin: 0 }`,
 | Compras por Período | [reporte-compras.ts](src/lib/reporte-compras.ts) | Administración → Reportes |
 | Cheques a Vencer | [reporte-cheques.ts](src/lib/reporte-cheques.ts) | Administración → Reportes |
 | Margen de Ventas por Artículos | [reporte-margen.ts](src/lib/reporte-margen.ts) | Administración → Reportes |
+| Ventas vs Pagos | [reporte-ventas-pagos.ts](src/lib/reporte-ventas-pagos.ts) | Administración → Reportes |
 
 Lo común (estilo, encabezado, pie, márgenes y la apertura de la pestaña) vive
 en [reporte-a4.ts](src/lib/reporte-a4.ts): un reporte nuevo arma su cuerpo y
@@ -365,6 +366,11 @@ con columnas ordenables, buscador y filas que se despliegan en los planes de
 cuotas en que se vendió. Agrupar, totalizar, ordenar y calcular márgenes vive
 en `reporte-margen.ts` y lo usan la pantalla y el PDF: **una sola fórmula**.
 Los indicadores son del período entero; el pie de la tabla, de lo que se ve.
+
+Ventas vs Pagos es **solo totales**: tres indicadores (vendido, pagado,
+diferencia) y dos recuadros con el desglose de cada lado. El endpoint devuelve
+un objeto, no `items`; las cuentas (total pagado, recibos sin forma de pago
+registrada, diferencia) están en `totalesVentasPagos` y las usan pantalla y PDF.
 
 Detalle de las vías del ticket y del error de Windows con la térmica USB en
 [GUIA-IMPRESION-USB.md](GUIA-IMPRESION-USB.md).

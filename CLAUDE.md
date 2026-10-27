@@ -30,6 +30,9 @@ abierta es el **módulo administrativo** (`/admin/*`, ERP), de escritorio:
   - **Margen de Ventas por Artículos** (pág. 61 de APEX): módulo propio, `backend/margen-articulos.sql`.
     Costo = última compra real hasta el fin del período; sin compra → "Sin costo", fuera de la
     ganancia. Margen sobre el costo.
+  - **Ventas vs Pagos**: total general del período, módulo propio, `backend/ventas-pagos.sql`.
+    Ventas = `VENTAS_CABECERA.TOTAL` por `FECHA_FACTURA` (precio a crédito, no lo cobrado).
+    Pagos = recibos de proveedores por fecha del recibo (cheques diferidos también) + compras contado.
   - **Regla para reportes nuevos: un archivo y un módulo ORDS por reporte, con el nombre de su ruta**
     (`/admin/reportes/<nombre>` → `backend/<nombre>.sql` → módulo `<nombre>`). Nunca un módulo
     `reportes` compartido: el `DELETE_MODULE` de uno borraría los otros.
